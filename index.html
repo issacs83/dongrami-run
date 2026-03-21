@@ -60,9 +60,47 @@
             touch-action: none;
             -webkit-user-select: none;
         }
+
+        /* 모바일 세로 모드일 때 가로로 회전 안내 */
+        #rotateOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #FFF;
+            font-family: Arial, sans-serif;
+        }
+        #rotateOverlay .icon { font-size: 80px; animation: rotatePhone 2s ease-in-out infinite; }
+        #rotateOverlay .text { font-size: 22px; margin-top: 20px; font-weight: bold; }
+        #rotateOverlay .sub { font-size: 14px; margin-top: 8px; color: #AAA; }
+        @keyframes rotatePhone {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(90deg); }
+            75% { transform: rotate(90deg); }
+        }
+
+        @media screen and (max-width: 768px) and (orientation: portrait) {
+            #rotateOverlay { display: flex !important; }
+            #gameContainer { display: none !important; }
+        }
+        @media screen and (max-width: 768px) and (orientation: landscape) {
+            #rotateOverlay { display: none !important; }
+            #gameContainer { display: flex !important; }
+        }
     </style>
 </head>
 <body>
+    <!-- 모바일 세로 모드 → 가로 회전 안내 -->
+    <div id="rotateOverlay">
+        <div class="icon">📱</div>
+        <div class="text">화면을 가로로 돌려주세요!</div>
+        <div class="sub">가로 모드에서 플레이할 수 있어요</div>
+    </div>
+
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
     </div>
@@ -409,85 +447,128 @@
             }
         };
 
-        // 김여름 캐릭터를 별미 뒤(4번째)에 삽입 — 순서: 동그라미, 네모미, 별미, 김여름, 삼각미, 하트미
-        (function insertKimYeoreum() {
-            const kimData = {
-                name: '김여름',
-                colors: { main: '#FFD700', secondary: '#FF8C00' },
-                size: 64,
+        // 추가 캐릭터 삽입 + 순서 재배치
+        // 최종 순서: 동그라미, 네모미, 별미, 삼각미, 김여름, 하트미, 동그라미하준
+        (function setupExtraCharacters() {
+            const kimYeoreum = {
+                name: '김여름', colors: { main: '#FFD700', secondary: '#FF8C00' }, size: 64,
                 drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
-                    ctx.save();
-                    ctx.translate(x + 32, y + 32);
-                    const glow = 1 + Math.sin(frameIndex * 0.15) * 0.08;
-                    ctx.scale(glow, glow);
-                    const rayAngle = frameIndex * 0.03;
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const glow = 1 + Math.sin(frameIndex * 0.15) * 0.08; ctx.scale(glow, glow);
                     ctx.fillStyle = '#FFD700';
                     for (let i = 0; i < 8; i++) {
-                        const angle = rayAngle + (i * Math.PI / 4);
-                        ctx.save();
-                        ctx.rotate(angle);
-                        ctx.beginPath();
-                        ctx.moveTo(-5, -20);
-                        ctx.lineTo(0, -32);
-                        ctx.lineTo(5, -20);
-                        ctx.closePath();
-                        ctx.fill();
-                        ctx.restore();
+                        const angle = frameIndex * 0.03 + (i * Math.PI / 4);
+                        ctx.save(); ctx.rotate(angle);
+                        ctx.beginPath(); ctx.moveTo(-5, -20); ctx.lineTo(0, -32); ctx.lineTo(5, -20);
+                        ctx.closePath(); ctx.fill(); ctx.restore();
                     }
-                    const sunGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 22);
-                    sunGrad.addColorStop(0, '#FFEE44');
-                    sunGrad.addColorStop(0.6, '#FFD700');
-                    sunGrad.addColorStop(1, '#FF8C00');
-                    ctx.fillStyle = sunGrad;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 22, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#FF6600';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    ctx.fillStyle = '#222222';
-                    ctx.beginPath();
-                    ctx.roundRect(-16, -10, 12, 8, 2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.roundRect(4, -10, 12, 8, 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#222222';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(-4, -6);
-                    ctx.lineTo(4, -6);
-                    ctx.stroke();
-                    ctx.strokeStyle = '#CC4400';
-                    ctx.lineWidth = 2.5;
-                    ctx.beginPath();
-                    ctx.arc(0, 4, 8, 0.1, Math.PI - 0.1, false);
-                    ctx.stroke();
+                    const sg = ctx.createRadialGradient(0,0,5,0,0,22);
+                    sg.addColorStop(0,'#FFEE44'); sg.addColorStop(0.6,'#FFD700'); sg.addColorStop(1,'#FF8C00');
+                    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill();
+                    ctx.strokeStyle = '#FF6600'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.roundRect(-16,-10,12,8,2); ctx.fill();
+                    ctx.beginPath(); ctx.roundRect(4,-10,12,8,2); ctx.fill();
+                    ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(-4,-6); ctx.lineTo(4,-6); ctx.stroke();
+                    ctx.strokeStyle = '#CC4400'; ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.arc(0,4,8,0.1,Math.PI-0.1,false); ctx.stroke();
                     if (isJumping) {
                         ctx.fillStyle = 'rgba(255,100,0,0.6)';
-                        for (let i = 0; i < 5; i++) {
-                            const fa = (frameIndex * 0.1 + i * 1.2);
-                            const fx = Math.cos(fa) * 28;
-                            const fy = Math.sin(fa) * 28;
-                            ctx.beginPath();
-                            ctx.arc(fx, fy, 3, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
+                        for (let i = 0; i < 5; i++) { const fa = frameIndex*0.1+i*1.2;
+                            ctx.beginPath(); ctx.arc(Math.cos(fa)*28, Math.sin(fa)*28, 3, 0, Math.PI*2); ctx.fill(); }
                     }
                     ctx.restore();
                 },
-                cost: 1000,
-                hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+                cost: 1000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
-            // 별미 뒤에 삽입하기 위해 순서 재구성
+
+            const donggramiHajun = {
+                name: '동그라미하준', colors: { main: '#E8A050', secondary: '#D4843C' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const bounce = Math.sin(frameIndex * 0.15) * 1.5;
+
+                    // 호빵 빵 본체 (따뜻한 갈색 그라데이션)
+                    const breadGrad = ctx.createRadialGradient(-3, -5, 4, 0, 0, 26);
+                    breadGrad.addColorStop(0, '#F5C882');
+                    breadGrad.addColorStop(0.5, '#E8A050');
+                    breadGrad.addColorStop(1, '#C07830');
+                    ctx.fillStyle = breadGrad;
+                    ctx.beginPath(); ctx.arc(0, bounce, 26, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#A06020'; ctx.lineWidth = 2; ctx.stroke();
+
+                    // 김 (호빵 위 갈라진 선)
+                    ctx.strokeStyle = '#A06020'; ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.moveTo(-8, -24 + bounce); ctx.quadraticCurveTo(0, -20 + bounce, 8, -24 + bounce); ctx.stroke();
+
+                    // 볼 (빨간 동그라미 — 호빵맨 특징)
+                    ctx.fillStyle = '#FF6666';
+                    ctx.beginPath(); ctx.arc(-15, 6 + bounce, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(15, 6 + bounce, 7, 0, Math.PI * 2); ctx.fill();
+
+                    // 큰 반짝 눈
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.ellipse(-8, -4 + bounce, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(8, -4 + bounce, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+                    // 눈동자 (앞을 봄)
+                    ctx.fillStyle = '#331100';
+                    ctx.beginPath(); ctx.arc(-6, -3 + bounce, 3.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(10, -3 + bounce, 3.5, 0, Math.PI * 2); ctx.fill();
+                    // 하이라이트
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-7, -5 + bounce, 1.8, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -5 + bounce, 1.8, 0, Math.PI * 2); ctx.fill();
+
+                    // 동그란 코 (빨강)
+                    ctx.fillStyle = '#FF4444';
+                    ctx.beginPath(); ctx.arc(0, 3 + bounce, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#CC2222'; ctx.lineWidth = 1; ctx.stroke();
+
+                    // 입 (활짝 웃음)
+                    ctx.strokeStyle = '#663300'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(0, 9 + bounce, 8, 0.15, Math.PI - 0.15, false); ctx.stroke();
+
+                    // 이름표 "하준" (귀여운 뱃지)
+                    ctx.fillStyle = '#FF6644';
+                    ctx.beginPath(); ctx.roundRect(-16, 18 + bounce, 32, 11, 5); ctx.fill();
+                    ctx.fillStyle = '#FFF'; ctx.font = 'bold 8px Arial';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('하준', 0, 23 + bounce);
+
+                    // 다리
+                    if (!isDucking) {
+                        let lo = Math.sin(frameIndex * 0.3) * 4;
+                        ctx.fillStyle = '#C07830';
+                        ctx.fillRect(-8, 26 + lo, 5, 9);
+                        ctx.fillRect(3, 26 - lo, 5, 9);
+                    }
+
+                    // 점프 시 김 올라오는 이펙트
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.5;
+                        ctx.fillStyle = '#FFF';
+                        for (let i = 0; i < 4; i++) {
+                            const sy = -28 - i * 6 - Math.sin(frameIndex * 0.2 + i) * 3;
+                            const sx = Math.sin(frameIndex * 0.1 + i * 2) * 8;
+                            ctx.beginPath(); ctx.arc(sx, sy + bounce, 2.5 - i * 0.4, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+
+                    ctx.restore();
+                },
+                cost: 3000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
+            // 순서 재배치: 동그라미, 네모미, 별미, 삼각미, 김여름, 하트미, 동그라미하준
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준'];
             const oldSprites = spriteConfig.sprites;
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun };
             const newSprites = {};
-            for (const key of Object.keys(oldSprites)) {
-                newSprites[key] = oldSprites[key];
-                if (key === '별미') {
-                    newSprites['김여름'] = kimData;
-                }
-            }
+            desiredOrder.forEach(name => {
+                if (oldSprites[name]) newSprites[name] = oldSprites[name];
+                else if (extras[name]) newSprites[name] = extras[name];
+            });
             spriteConfig.sprites = newSprites;
         })();
 
@@ -523,8 +604,11 @@
             })(),
             gameStartTime: 0,
             gameTime: 0,
-            winterCount: 0,      // 겨울을 지난 횟수
-            seasonLevel: 0,      // 겨울 통과 보너스 레벨 (0.5씩 증가)
+            winterCount: 0,
+            seasonLevel: 0,
+            bgmVolume: parseFloat(localStorage.getItem('bgmVolume')) || 1.0,   // 0~1
+            sfxVolume: parseFloat(localStorage.getItem('sfxVolume')) || 1.0,    // 0~1
+            bgmMuted: localStorage.getItem('bgmMuted') === 'true',
         };
 
         // ============================================================================
@@ -663,7 +747,7 @@
                 this.beatIndex = 0;
                 this.bpm = 120;
                 this.isPlaying = false;
-                this.targetVolume = 0.35; // BGM 볼륨
+                this.targetVolume = 0.7; // BGM 볼륨 (효과음 수준)
                 this.seasonTransitionOverlay = null; // { season, timer, maxTime }
 
                 // 계절별 음악 패턴 정의
@@ -676,44 +760,41 @@
                         bass: [0,0,3,3, 5,5,4,4],
                         waveType: 'triangle',
                         bassType: 'sine',
-                        melodyVol: 0.28,
-                        bassVol: 0.18,
+                        melodyVol: 0.45,
+                        bassVol: 0.30,
                         arpeggio: true
                     },
                     summer: {
-                        // 여름: 활기차고 리드미컬 (D 메이저, 가장 빠름)
                         bpm: 150,
                         scale: [293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 554.37, 587.33],
                         melody: [0,4,2,5, 7,5,4,2, 0,2,4,7, 5,4,2,0],
                         bass: [0,0,4,4, 5,5,2,2],
                         waveType: 'square',
                         bassType: 'triangle',
-                        melodyVol: 0.18,
-                        bassVol: 0.12,
+                        melodyVol: 0.30,
+                        bassVol: 0.20,
                         arpeggio: false
                     },
                     autumn: {
-                        // 가을: 차분하고 서정적 (A 마이너, 느린 템포)
                         bpm: 108,
                         scale: [220.00, 246.94, 261.63, 293.66, 329.63, 349.23, 392.00, 440.00],
                         melody: [0,2,4,7, 5,4,2,0, 3,5,7,5, 4,2,0,2],
                         bass: [0,0,3,3, 5,5,4,4],
                         waveType: 'triangle',
                         bassType: 'sine',
-                        melodyVol: 0.25,
-                        bassVol: 0.16,
+                        melodyVol: 0.40,
+                        bassVol: 0.28,
                         arpeggio: false
                     },
                     winter: {
-                        // 겨울: 고요하고 신비로운 (E 마이너, 가장 느림)
                         bpm: 96,
                         scale: [164.81, 185.00, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63],
                         melody: [0,3,5,7, 5,3,2,0, 4,5,7,5, 3,2,0,3],
                         bass: [0,0,2,2, 4,4,3,3],
                         waveType: 'sine',
                         bassType: 'sine',
-                        melodyVol: 0.25,
-                        bassVol: 0.20,
+                        melodyVol: 0.40,
+                        bassVol: 0.35,
                         arpeggio: true
                     }
                 };
@@ -744,6 +825,19 @@
                     this.bgmGain = this.am.audioContext.createGain();
                     this.bgmGain.gain.value = this.targetVolume;
                     this.bgmGain.connect(this.am.masterGain);
+                }
+            }
+
+            setVolume(vol) {
+                this.targetVolume = 0.7 * vol; // vol: 0~1
+                if (this.bgmGain && this.am.audioContext) {
+                    this.bgmGain.gain.setValueAtTime(this.targetVolume, this.am.audioContext.currentTime);
+                }
+            }
+
+            setMuted(muted) {
+                if (this.bgmGain && this.am.audioContext) {
+                    this.bgmGain.gain.setValueAtTime(muted ? 0 : this.targetVolume, this.am.audioContext.currentTime);
                 }
             }
 
@@ -2169,22 +2263,31 @@
                 // 캐릭터 선택 버튼
                 ctx.fillStyle = '#FF8800';
                 ctx.beginPath();
-                ctx.roundRect(GAME_CONFIG.width/2 - 150, 375, 300, 55, 12);
+                ctx.roundRect(GAME_CONFIG.width/2 - 150, 375, 140, 50, 12);
                 ctx.fill();
                 ctx.fillStyle = '#FFFFFF';
-                ctx.font = 'bold 26px Arial';
-                ctx.fillText('캐릭터 선택', GAME_CONFIG.width/2, 403);
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText('캐릭터', GAME_CONFIG.width/2 - 80, 401);
+
+                // 설정 버튼
+                ctx.fillStyle = '#666';
+                ctx.beginPath();
+                ctx.roundRect(GAME_CONFIG.width/2 + 10, 375, 140, 50, 12);
+                ctx.fill();
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText('⚙ 설정', GAME_CONFIG.width/2 + 80, 401);
 
                 // 조작법 안내
                 ctx.fillStyle = '#888';
-                ctx.font = '16px Arial';
-                ctx.fillText('탭 = 점프 / 더블탭 = 더블점프 / 아래 스와이프 = 숙이기', GAME_CONFIG.width/2, 465);
+                ctx.font = '15px Arial';
+                ctx.fillText('탭 = 점프 / 더블탭 = 더블점프 / 아래 스와이프 = 숙이기', GAME_CONFIG.width/2, 455);
 
                 // 버전 표시 (우측 하단)
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v2.1.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.0.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -2217,9 +2320,138 @@
                     }
                 }
                 // 캐릭터 선택 버튼 영역
-                if (mx >= cx - 150 && mx <= cx + 150 && my >= 375 && my <= 430) {
+                if (mx >= cx - 150 && mx <= cx - 10 && my >= 375 && my <= 425) {
                     gameState.currentScene = 'select';
                 }
+                // 설정 버튼 영역
+                if (mx >= cx + 10 && mx <= cx + 150 && my >= 375 && my <= 425) {
+                    gameState.currentScene = 'settings';
+                }
+            }
+        }
+
+        // ============================================================================
+        // SETTINGS SCENE - 설정 메뉴
+        // ============================================================================
+        class SettingsScene {
+            constructor() {
+                this.bg = new Background();
+                this.dragging = null; // 'bgm' or 'sfx'
+            }
+
+            update(deltaTime) {
+                this.bg.update(deltaTime * 0.2);
+            }
+
+            draw(ctx) {
+                this.bg.draw(ctx);
+                const W = GAME_CONFIG.width, H = GAME_CONFIG.height;
+
+                // 메인 패널
+                ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                ctx.beginPath(); ctx.roundRect(W/2 - 260, 30, 520, H - 60, 20); ctx.fill();
+                ctx.strokeStyle = '#666'; ctx.lineWidth = 3; ctx.stroke();
+
+                ctx.save();
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+                // 제목
+                ctx.fillStyle = '#333'; ctx.font = 'bold 36px Arial';
+                ctx.fillText('⚙ 설정', W/2, 70);
+
+                // BGM 볼륨
+                const sliderX = W/2 - 150, sliderW = 300, sliderY1 = 140, sliderY2 = 230;
+
+                ctx.fillStyle = '#444'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'left';
+                ctx.fillText('🎵 배경음악', sliderX, sliderY1 - 25);
+                // 음소거 버튼
+                ctx.textAlign = 'right';
+                ctx.fillStyle = gameState.bgmMuted ? '#CC0000' : '#22AA22';
+                ctx.font = 'bold 18px Arial';
+                ctx.fillText(gameState.bgmMuted ? '🔇 OFF' : '🔊 ON', sliderX + sliderW, sliderY1 - 25);
+
+                this._drawSlider(ctx, sliderX, sliderY1, sliderW, gameState.bgmMuted ? 0 : gameState.bgmVolume, '#0099FF');
+
+                // SFX 볼륨
+                ctx.textAlign = 'left'; ctx.fillStyle = '#444'; ctx.font = 'bold 20px Arial';
+                ctx.fillText('🔔 효과음', sliderX, sliderY2 - 25);
+                this._drawSlider(ctx, sliderX, sliderY2, sliderW, gameState.sfxVolume, '#FF8800');
+
+                // 현재 통계
+                ctx.textAlign = 'center'; ctx.fillStyle = '#666'; ctx.font = '18px Arial';
+                ctx.fillText(`총 게임 횟수: ${gameState.totalGames || 0}`, W/2, 310);
+                ctx.fillText(`최고 점수: ${gameState.bestScore}`, W/2, 340);
+                ctx.fillText(`보유 동전: ${gameState.totalCoins}`, W/2, 370);
+
+                // 돌아가기 버튼
+                ctx.fillStyle = '#666';
+                ctx.beginPath(); ctx.roundRect(W/2 - 80, H - 80, 160, 45, 10); ctx.fill();
+                ctx.fillStyle = '#FFF'; ctx.font = 'bold 22px Arial';
+                ctx.fillText('← 돌아가기', W/2, H - 57);
+
+                ctx.restore();
+            }
+
+            _drawSlider(ctx, x, y, w, value, color) {
+                // 트랙 배경
+                ctx.fillStyle = '#DDD';
+                ctx.beginPath(); ctx.roundRect(x, y - 6, w, 12, 6); ctx.fill();
+                // 채워진 부분
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.roundRect(x, y - 6, w * value, 12, 6); ctx.fill();
+                // 핸들
+                const hx = x + w * value;
+                ctx.fillStyle = '#FFF'; ctx.strokeStyle = color; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(hx, y, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                // 퍼센트 표시
+                ctx.fillStyle = '#333'; ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(Math.round(value * 100) + '%', hx, y);
+            }
+
+            handleInput(inputState) {
+                const mx = inputManager.lastTouchX;
+                const my = inputManager.lastTouchY;
+                if (mx === undefined || my === undefined) return;
+
+                const W = GAME_CONFIG.width, H = GAME_CONFIG.height;
+                const sliderX = W/2 - 150, sliderW = 300;
+
+                // 슬라이더 드래그 (터치 이동 시)
+                if (inputState.jumping || this.dragging) {
+                    // BGM 슬라이더 영역 (y=140 ± 20)
+                    if (my >= 120 && my <= 160) {
+                        const val = Math.max(0, Math.min(1, (mx - sliderX) / sliderW));
+                        gameState.bgmVolume = val;
+                        gameState.bgmMuted = false;
+                        localStorage.setItem('bgmVolume', val);
+                        localStorage.setItem('bgmMuted', 'false');
+                        if (typeof seasonalBGM !== 'undefined') { seasonalBGM.setVolume(val); seasonalBGM.setMuted(false); }
+                        this.dragging = 'bgm';
+                    }
+                    // SFX 슬라이더 영역 (y=230 ± 20)
+                    else if (my >= 210 && my <= 250) {
+                        const val = Math.max(0, Math.min(1, (mx - sliderX) / sliderW));
+                        gameState.sfxVolume = val;
+                        localStorage.setItem('sfxVolume', val);
+                        if (audioManager.masterGain) audioManager.masterGain.gain.value = 0.3 * val;
+                        this.dragging = 'sfx';
+                    }
+                    // BGM 음소거 토글 (우측 상단)
+                    else if (inputState.jumping && mx >= sliderX + sliderW - 80 && mx <= sliderX + sliderW &&
+                             my >= 105 && my <= 130) {
+                        gameState.bgmMuted = !gameState.bgmMuted;
+                        localStorage.setItem('bgmMuted', gameState.bgmMuted);
+                        if (typeof seasonalBGM !== 'undefined') seasonalBGM.setMuted(gameState.bgmMuted);
+                    }
+                    // 돌아가기
+                    else if (inputState.jumping && mx >= W/2 - 80 && mx <= W/2 + 80 && my >= H - 80 && my <= H - 35) {
+                        gameState.currentScene = 'title';
+                        this.dragging = null;
+                    }
+                }
+
+                if (!inputState.jumping) this.dragging = null;
             }
         }
 
@@ -2266,28 +2498,36 @@
                 ctx.font = 'bold 24px Arial';
                 ctx.fillText(`보유 동전: ${gameState.totalCoins}`, GAME_CONFIG.width/2, 100);
 
-                // 캐릭터 그리드 (6개까지 지원)
+                // 캐릭터 그리드 (2줄 지원, 상단 4개 + 하단 나머지)
                 const keys = Object.keys(spriteConfig.sprites);
-                const cols = Math.min(keys.length, 6);
-                const cellW = Math.min(150, (GAME_CONFIG.width - 100) / cols);
-                const cellH = 180;
-                const startX = GAME_CONFIG.width/2 - (cols * cellW) / 2;
-                const startY = 130;
+                const cols = 4;
+                const cellW = 130;
+                const cellH = 150;
+                const gridW = cols * cellW;
+                const gridStartX = GAME_CONFIG.width/2 - gridW / 2;
+                const startY = 120;
 
                 keys.forEach((key, i) => {
                     const char = spriteConfig.sprites[key];
+                    const row = Math.floor(i / cols);
                     const col = i % cols;
-                    const cx = startX + col * cellW + cellW / 2;
-                    const cy = startY + cellH / 2;
+                    // 하단 줄은 중앙 정렬
+                    const rowCount = row === 0 ? Math.min(keys.length, cols) : keys.length - cols;
+                    const rowStartX = row === 0 ? gridStartX : GAME_CONFIG.width/2 - (rowCount * cellW) / 2;
+                    const cx = rowStartX + col * cellW + cellW / 2;
+                    const cy = startY + row * (cellH + 10) + cellH / 2;
                     const isSelected = gameState.selectedCharacter === key;
                     const isUnlocked = gameState.unlockedCharacters.includes(key);
+
+                    // 카드 Y 좌표 (행 기반)
+                    const cardY = startY + row * (cellH + 10);
 
                     // 카드 배경
                     ctx.fillStyle = isSelected ? '#E0F0FF' : '#F5F5F5';
                     ctx.strokeStyle = isSelected ? '#0099FF' : '#DDD';
                     ctx.lineWidth = isSelected ? 3 : 1;
                     ctx.beginPath();
-                    ctx.roundRect(cx - 60, startY, 120, cellH - 10, 10);
+                    ctx.roundRect(cx - 55, cardY, 110, cellH - 10, 10);
                     ctx.fill();
                     ctx.stroke();
 
@@ -2295,44 +2535,43 @@
                     if (char.drawSprite) {
                         if (!isUnlocked) ctx.globalAlpha = 0.35;
                         try {
-                            char.drawSprite(ctx, cx - 32, startY + 15, this.charFrame, false, false);
+                            char.drawSprite(ctx, cx - 32, cardY + 10, this.charFrame, false, false);
                         } catch(e) {
                             ctx.fillStyle = char.colors ? char.colors.main : '#CCC';
                             ctx.beginPath();
-                            ctx.arc(cx, startY + 50, 22, 0, Math.PI * 2);
+                            ctx.arc(cx, cardY + 45, 22, 0, Math.PI * 2);
                             ctx.fill();
                         }
                         ctx.globalAlpha = 1;
                     }
                     if (!isUnlocked) {
-                        // 잠금 아이콘 오버레이
                         ctx.fillStyle = 'rgba(0,0,0,0.3)';
                         ctx.beginPath();
-                        ctx.arc(cx, startY + 47, 25, 0, Math.PI * 2);
+                        ctx.arc(cx, cardY + 42, 22, 0, Math.PI * 2);
                         ctx.fill();
                         ctx.fillStyle = '#FFF';
-                        ctx.font = 'bold 28px Arial';
-                        ctx.fillText('🔒', cx, startY + 50);
+                        ctx.font = 'bold 24px Arial';
+                        ctx.fillText('🔒', cx, cardY + 45);
                     }
 
                     // 이름
                     ctx.fillStyle = '#333';
-                    ctx.font = 'bold 16px Arial';
-                    ctx.fillText(char.name, cx, startY + cellH - 50);
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(char.name, cx, cardY + cellH - 40);
 
                     // 가격 또는 상태
                     if (isSelected && isUnlocked) {
                         ctx.fillStyle = '#0099FF';
-                        ctx.font = 'bold 14px Arial';
-                        ctx.fillText('✓ 선택됨', cx, startY + cellH - 30);
+                        ctx.font = 'bold 13px Arial';
+                        ctx.fillText('✓ 선택됨', cx, cardY + cellH - 22);
                     } else if (isUnlocked) {
                         ctx.fillStyle = '#22BB22';
-                        ctx.font = '14px Arial';
-                        ctx.fillText('보유중', cx, startY + cellH - 30);
+                        ctx.font = '13px Arial';
+                        ctx.fillText('보유중', cx, cardY + cellH - 22);
                     } else {
                         ctx.fillStyle = '#FF8800';
-                        ctx.font = 'bold 14px Arial';
-                        ctx.fillText(`${char.cost} 동전`, cx, startY + cellH - 30);
+                        ctx.font = 'bold 13px Arial';
+                        ctx.fillText(`${char.cost} 동전`, cx, cardY + cellH - 22);
                     }
                 });
 
@@ -2373,21 +2612,26 @@
                     return;
                 }
 
-                // 캐릭터 카드 클릭 판정
+                // 캐릭터 카드 클릭 판정 (2줄 그리드)
                 const keys = Object.keys(spriteConfig.sprites);
-                const cols = Math.min(keys.length, 6);
-                const cellW = Math.min(150, (GAME_CONFIG.width - 100) / cols);
-                const cellH = 180;
-                const startX = GAME_CONFIG.width/2 - (cols * cellW) / 2;
-                const startY = 130;
+                const cols = 4;
+                const cellW = 130;
+                const cellH = 150;
+                const gridW = cols * cellW;
+                const gridStartX = GAME_CONFIG.width/2 - gridW / 2;
+                const startY = 120;
 
                 keys.forEach((key, i) => {
                     const char = spriteConfig.sprites[key];
+                    const row = Math.floor(i / cols);
                     const col = i % cols;
-                    const cx = startX + col * cellW + cellW / 2;
+                    const rowCount = row === 0 ? Math.min(keys.length, cols) : keys.length - cols;
+                    const rowStartX = row === 0 ? gridStartX : GAME_CONFIG.width/2 - (rowCount * cellW) / 2;
+                    const cx = rowStartX + col * cellW + cellW / 2;
+                    const cardY = startY + row * (cellH + 10);
                     const isUnlocked = gameState.unlockedCharacters.includes(key);
 
-                    if (mx >= cx - 60 && mx <= cx + 60 && my >= startY && my <= startY + cellH - 10) {
+                    if (mx >= cx - 55 && mx <= cx + 55 && my >= cardY && my <= cardY + cellH - 10) {
                         if (isUnlocked) {
                             gameState.selectedCharacter = key;
                             localStorage.setItem('selectedCharacter', key);
@@ -2460,7 +2704,7 @@
                 const rawSeason = getCurrentSeason(gameState.score || 0);
                 if (this.prevSeasonForWinter === 'winter' && rawSeason === 'spring') {
                     gameState.winterCount++;
-                    gameState.seasonLevel = Math.min(100, gameState.winterCount * 0.5);
+                    // speedLevel은 매 프레임 자동 계산됨 (winterCount / 5)
                 }
                 this.prevSeasonForWinter = rawSeason;
 
@@ -2473,33 +2717,31 @@
                 this.particles.update(deltaTime);
 
                 // ═══════════════════════════════════════════════════════════
-                // 속도 시스템 (v2.1 리팩터링)
+                // 속도 시스템 (v3.0 전면 재설계)
                 // ─────────────────────────────────────────────────────────
-                // 속도 = 기본속도 + (점수 기반 미세 증가) + (겨울 통과 보너스)
+                // ★ 핵심 규칙:
+                //   - 계절 변화는 속도에 영향 없음 (시각효과만)
+                //   - 봄→여름→가을→겨울 = 1세트 (200점)
+                //   - 5세트(겨울 5회 통과) = 레벨 1 증가
+                //   - 레벨 0~100, 레벨에 따른 지수적 속도 증가
+                //   - 낮은 레벨: 속도 거의 안 올라감
+                //   - 높은 레벨: 속도 급격히 올라감
                 //
-                // 1) 점수 기반: score * 0.005 → 200점(1순환)에 +1.0 속도
-                //    자연스럽고 일정한 증가. 급변 없음.
-                // 2) 겨울 통과 보너스: winterCount * 0.5 (겨울→봄 전환 시 +0.5)
-                //    순환할수록 확실히 빨라지는 체감.
-                // 3) 최대속도 12 제한
-                //
-                // 예시 진행:
-                //   0점(시작):     4.5
-                //   200점(1순환):  4.5 + 1.0 + 0.5 = 6.0
-                //   400점(2순환):  4.5 + 2.0 + 1.0 = 7.5
-                //   600점(3순환):  4.5 + 3.0 + 1.5 = 9.0
-                //   800점(4순환):  4.5 + 4.0 + 2.0 = 10.5
-                //   1000점(5순환): 4.5 + 5.0 + 2.5 = 12.0 (최대)
+                // 공식: speed = 4.5 + 7.5 * (level/100)^2.5
+                //   LV.0  → 4.5 (기본)
+                //   LV.10 → 4.5 + 7.5 * 0.003 = 4.52
+                //   LV.20 → 4.5 + 7.5 * 0.018 = 4.63
+                //   LV.50 → 4.5 + 7.5 * 0.177 = 5.83
+                //   LV.80 → 4.5 + 7.5 * 0.572 = 8.79
+                //   LV.90 → 4.5 + 7.5 * 0.769 = 10.27
+                //   LV.100→ 4.5 + 7.5 * 1.000 = 12.0 (최대)
                 // ═══════════════════════════════════════════════════════════
-                const scoreSpeed = gameState.score * 0.005;
-                const winterBonus = gameState.winterCount * 0.5;
+                gameState.speedLevel = Math.min(100, Math.floor(gameState.winterCount / 5));
+                const t = gameState.speedLevel / 100; // 0~1
                 gameState.gameSpeed = Math.min(
                     GAME_CONFIG.maxSpeed,
-                    GAME_CONFIG.initialSpeed + scoreSpeed + winterBonus
+                    GAME_CONFIG.initialSpeed + (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed) * Math.pow(t, 2.5)
                 );
-                gameState.speedLevel = Math.min(100, Math.floor(
-                    ((gameState.gameSpeed - GAME_CONFIG.initialSpeed) / (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed)) * 100
-                ));
 
                 // Spawn obstacles (deltaTime 기반 — 끊김 방지)
                 this.obstacleTimer -= deltaTime;
@@ -2676,11 +2918,12 @@
                 ctx.fillStyle = gameState.speedLevel >= 80 ? '#FF2200' : gameState.speedLevel >= 50 ? '#FF8800' : '#0066CC';
                 ctx.fillText(`⚡ LV.${gameState.speedLevel}`, 230, 22);
 
-                // 겨울 통과 횟수 표시 (속도 보너스 표시)
+                // 겨울 통과 횟수 (5회 = 1레벨)
                 if (gameState.winterCount > 0) {
-                    ctx.font = 'bold 18px Arial';
+                    const nextLvAt = (Math.floor(gameState.winterCount / 5) + 1) * 5;
+                    ctx.font = 'bold 16px Arial';
                     ctx.fillStyle = '#4488CC';
-                    ctx.fillText(`❄️ x${gameState.winterCount}`, 370, 24);
+                    ctx.fillText(`❄️${gameState.winterCount}/${nextLvAt}`, 370, 24);
                 }
 
                 ctx.fillStyle = '#000000';
@@ -2753,7 +2996,7 @@
                 const seasonLabels = { spring: '봄 🌸', summer: '여름 ☀️', autumn: '가을 🍂', winter: '겨울 ❄️' };
                 this.reachedSeason = seasonLabels[getCurrentSeason(this.finalScore)] || '봄 🌸';
                 this.finalWinterCount = gameState.winterCount;
-                this.finalSeasonLevel = gameState.seasonLevel;
+                this.finalLevel = gameState.speedLevel;
 
                 // 입력 차단: 2초 동안 버튼 비활성 + 터치 좌표 초기화
                 this.inputDelay = 2.0;
@@ -2899,7 +3142,7 @@
                 ctx.font = 'bold 22px Arial';
                 ctx.fillText(this.reachedSeason, px + pw - 60, ly);
 
-                // 겨울 통과 횟수 & 계절 레벨
+                // 겨울 통과 횟수 & 레벨
                 if (this.finalWinterCount > 0) {
                     ly += lineH;
                     ctx.textAlign = 'left';
@@ -2909,7 +3152,7 @@
                     ctx.textAlign = 'right';
                     ctx.fillStyle = '#4488CC';
                     ctx.font = 'bold 22px Arial';
-                    ctx.fillText(`${this.finalWinterCount}회 (레벨 +${this.finalSeasonLevel.toFixed(1)})`, px + pw - 60, ly);
+                    ctx.fillText(`${this.finalWinterCount}회 (LV.${this.finalLevel})`, px + pw - 60, ly);
                 }
 
                 // 속도 레벨
@@ -3037,6 +3280,7 @@
                 this.scenes = {
                     title: new TitleScene(),
                     select: new SelectScene(),
+                    settings: new SettingsScene(),
                     game: null,
                     gameOver: null
                 };
@@ -3071,6 +3315,9 @@
                 } else if (gameState.currentScene === 'select') {
                     this.scenes.select.update(deltaTime);
                     this.scenes.select.handleInput(inputState);
+                } else if (gameState.currentScene === 'settings') {
+                    this.scenes.settings.update(deltaTime);
+                    this.scenes.settings.handleInput(inputState);
                 } else if (gameState.currentScene === 'game') {
                     if (!this.scenes.game) {
                         this.scenes.game = new GameScene();
@@ -3094,6 +3341,8 @@
                     this.scenes.title.draw(this.ctx);
                 } else if (gameState.currentScene === 'select') {
                     this.scenes.select.draw(this.ctx);
+                } else if (gameState.currentScene === 'settings') {
+                    this.scenes.settings.draw(this.ctx);
                 } else if (gameState.currentScene === 'game' && this.scenes.game) {
                     this.scenes.game.draw(this.ctx);
                 } else if (gameState.currentScene === 'gameOver' && this.scenes.gameOver) {
