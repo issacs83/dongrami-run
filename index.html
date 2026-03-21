@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.8.3';
+        var CURRENT_VER = 'v3.9.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -742,10 +742,68 @@
                 cost: 0, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 가스미 (독가스 구름 캐릭터 - 방귀 부스터 능력)
+            const gasmi = {
+                name: '가스미', colors: { main: '#66BB6A', secondary: '#388E3C' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const wobble = Math.sin(frameIndex * 0.15) * 2;
+                    const puff = 1 + Math.sin(frameIndex * 0.1) * 0.04;
+                    ctx.scale(puff, puff);
+                    // 독가스 오라
+                    ctx.fillStyle = 'rgba(102,187,106,0.12)';
+                    ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2); ctx.fill();
+                    // 구름 몸체 (여러 원으로 구름 형태)
+                    const cloudGrad = ctx.createRadialGradient(-2, -3, 4, 0, 0, 26);
+                    cloudGrad.addColorStop(0, '#A5D6A7');
+                    cloudGrad.addColorStop(0.4, '#66BB6A');
+                    cloudGrad.addColorStop(0.8, '#43A047');
+                    cloudGrad.addColorStop(1, '#2E7D32');
+                    ctx.fillStyle = cloudGrad;
+                    // 메인 구름 덩어리
+                    ctx.beginPath(); ctx.arc(0, 2, 22, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(-14, -2 + wobble * 0.3, 14, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(14, -2 - wobble * 0.3, 14, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(-6, -14, 12, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -12 + wobble * 0.2, 11, 0, Math.PI * 2); ctx.fill();
+                    // 구름 테두리 발광
+                    ctx.strokeStyle = 'rgba(76,175,80,0.4)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(0, 2, 22, 0, Math.PI * 2); ctx.stroke();
+                    // 눈 (장난꾸러기 표정)
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-9, -3, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -3, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#1B5E20';
+                    ctx.beginPath(); ctx.arc(-7, -2, 3.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(11, -2, 3.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, -4, 1.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(10, -4, 1.5, 0, Math.PI * 2); ctx.fill();
+                    // 장난꾸러기 웃음
+                    ctx.strokeStyle = '#1B5E20'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.arc(0, 6, 9, 0.2, Math.PI - 0.2); ctx.stroke();
+                    // 방귀 이펙트 (점프 시)
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.5;
+                        ctx.fillStyle = '#81C784';
+                        for (let i = 0; i < 5; i++) {
+                            const a = frameIndex * 0.15 + i * 1.26;
+                            const r = 28 + Math.sin(a * 2) * 6;
+                            const s = 2 + Math.sin(a) * 1.5;
+                            ctx.beginPath(); ctx.arc(Math.cos(a)*r, Math.sin(a)*r + 8, s, 0, Math.PI*2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -807,6 +865,7 @@
             '하트미': { name: '봄의 축복', desc: '봄에 1초마다 코인+1', type: 'springCoin' },
             '김여름': { name: '여름의 열기', desc: '여름 코인자동+코인3배', type: 'summerCoin', coinMulti: 3 },
             '동그라미하준': { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
+            '가스미': { name: '방귀 부스터', desc: '독가스로 주변 적 제거 (10회)', type: 'fartBoost', charges: 10 },
             '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
         };
 
@@ -1284,6 +1343,9 @@
                     if (e.key === 'ArrowDown') {
                         this.ducking = true;
                     }
+                    if (e.key === 'f' || e.key === 'F') {
+                        this.fartPressed = true;
+                    }
                 });
 
                 document.addEventListener('keyup', (e) => {
@@ -1353,10 +1415,13 @@
             }
 
             getInputState() {
-                return {
+                const state = {
                     jumping: this.jumping,
-                    ducking: this.ducking
+                    ducking: this.ducking,
+                    fart: this.fartPressed
                 };
+                this.fartPressed = false;
+                return state;
             }
 
             resetJump() {
@@ -2856,7 +2921,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.8.3', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.9.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -2893,6 +2958,7 @@
                         if (ability.type === 'springCoin') gameState.abilityState.springCoinTimer = 0;
                         if (ability.type === 'summerCoin') gameState.abilityState.seasonCoinTimer = 0;
                         if (ability.type === 'autumnWinterCoin') gameState.abilityState.seasonCoinTimer = 0;
+                        if (ability.type === 'fartBoost') gameState.abilityState.fartCharges = ability.charges;
                     }
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
@@ -3296,6 +3362,10 @@
                     this.player.activePowerUp = 'shield';
                     this.player.powerUpTimer = 999; // 한번 맞을 때까지 유지
                 }
+                // 가스미 방귀 이펙트 타이머
+                this.fartEffectTimer = 0;
+                this.fartEffectX = 0;
+                this.fartEffectY = 0;
             }
 
             update(inputState, deltaTime) {
@@ -3368,6 +3438,14 @@
 
                 this.player.update(inputState, deltaTime);
                 this.particles.update(deltaTime);
+
+                // 가스미 방귀 부스터: 키보드 F키 활성화
+                if (inputState.fart && CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'fartBoost' &&
+                    (gameState.abilityState?.fartCharges || 0) > 0) {
+                    this.activateFartBoost();
+                }
+                // 방귀 이펙트 타이머 감소
+                if (this.fartEffectTimer > 0) this.fartEffectTimer -= deltaTime;
 
                 // ═══════════════════════════════════════════════════════════
                 // 속도 시스템 (v3.0 전면 재설계)
@@ -3710,6 +3788,57 @@
                     ctx.textAlign = 'left';
                     ctx.fillText('✨ 코인 2배!', 15, 135);
                 }
+                // 가스미 방귀 부스터 HUD
+                if (abilityType === 'fartBoost') {
+                    const charges = gameState.abilityState?.fartCharges || 0;
+                    // 잔여 횟수 표시 (좌측 상단)
+                    ctx.fillStyle = charges > 0 ? '#66BB6A' : '#666';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`💨 방귀 ${charges}회`, 15, 135);
+                    // 활성화 버튼 (우측 하단)
+                    if (charges > 0) {
+                        const btnX = GAME_CONFIG.width - 120;
+                        const btnY = GAME_CONFIG.height - 65;
+                        // 버튼 배경
+                        ctx.fillStyle = 'rgba(102,187,106,0.85)';
+                        ctx.beginPath(); ctx.roundRect(btnX, btnY, 110, 50, 12); ctx.fill();
+                        ctx.strokeStyle = '#2E7D32'; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.roundRect(btnX, btnY, 110, 50, 12); ctx.stroke();
+                        // 버튼 텍스트
+                        ctx.fillStyle = '#FFF';
+                        ctx.font = 'bold 18px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('💨 방귀!', btnX + 55, btnY + 30);
+                        // PC 안내
+                        ctx.font = '10px Arial';
+                        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                        ctx.fillText('(F키)', btnX + 55, btnY + 45);
+                    }
+                }
+                // 방귀 이펙트 시각효과 (독가스 구름 퍼지기)
+                if (this.fartEffectTimer > 0) {
+                    const progress = 1 - this.fartEffectTimer / 0.8;
+                    const radius = 50 + progress * 180;
+                    const alpha = (1 - progress) * 0.4;
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    // 녹색 독가스 원
+                    const gasGrad = ctx.createRadialGradient(this.fartEffectX, this.fartEffectY, 0, this.fartEffectX, this.fartEffectY, radius);
+                    gasGrad.addColorStop(0, 'rgba(102,187,106,0.6)');
+                    gasGrad.addColorStop(0.5, 'rgba(76,175,80,0.3)');
+                    gasGrad.addColorStop(1, 'rgba(56,142,60,0)');
+                    ctx.fillStyle = gasGrad;
+                    ctx.beginPath(); ctx.arc(this.fartEffectX, this.fartEffectY, radius, 0, Math.PI * 2); ctx.fill();
+                    // 독가스 파티클
+                    for (let i = 0; i < 8; i++) {
+                        const a = i * Math.PI / 4 + progress * 2;
+                        const r = radius * (0.3 + Math.sin(a * 3) * 0.2);
+                        ctx.fillStyle = `rgba(129,199,132,${alpha * 0.8})`;
+                        ctx.beginPath(); ctx.arc(this.fartEffectX + Math.cos(a) * r, this.fartEffectY + Math.sin(a) * r, 6 + progress * 4, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.restore();
+                }
 
                 // 피격 빨간 번쩍 이펙트
                 if (gameState.hitFlashTimer > 0) {
@@ -3732,10 +3861,54 @@
                 }
             }
 
+            activateFartBoost() {
+                if ((gameState.abilityState?.fartCharges || 0) <= 0) return;
+                gameState.abilityState.fartCharges--;
+                // 독가스 이펙트 위치 (플레이어 중심)
+                this.fartEffectTimer = 0.8;
+                this.fartEffectX = this.player.x + this.player.width / 2;
+                this.fartEffectY = this.player.y + this.player.height / 2;
+                // 주변 200px 범위 내 모든 장애물/악당 제거
+                const px = this.player.x + this.player.width / 2;
+                const py = this.player.y + this.player.height / 2;
+                const range = 200;
+                const destroyed = [];
+                this.obstacles = this.obstacles.filter(o => {
+                    const ox = o.x + (o.width || 40) / 2;
+                    const oy = o.y + (o.height || 40) / 2;
+                    const dist = Math.sqrt((px - ox) ** 2 + (py - oy) ** 2);
+                    if (dist < range) {
+                        destroyed.push({ x: ox, y: oy });
+                        return false;
+                    }
+                    return true;
+                });
+                // 제거 이펙트 파티클
+                destroyed.forEach(d => {
+                    for (let i = 0; i < 8; i++) {
+                        this.particles.addParticle(d.x, d.y, '#66BB6A');
+                        this.particles.addParticle(d.x, d.y, '#81C784');
+                    }
+                });
+                // 사운드
+                audioManager.playPowerUpSound();
+            }
+
             handleInput(inputState) {
                 const mx = inputManager.lastTouchX;
                 const my = inputManager.lastTouchY;
                 if (mx === undefined || my === undefined) return;
+
+                // 가스미 방귀 부스터 버튼: 우측 하단 (width-120, height-65) ~ (width-10, height-15)
+                const abilityType = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
+                if (abilityType === 'fartBoost' && inputState.jumping && !gameState.isPaused &&
+                    (gameState.abilityState?.fartCharges || 0) > 0 &&
+                    mx >= GAME_CONFIG.width - 120 && mx <= GAME_CONFIG.width - 10 &&
+                    my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
+                    this.activateFartBoost();
+                    inputManager.resetJump();
+                    return;
+                }
 
                 // Pause 버튼 영역: (width-70, 20) ~ (width-20, 70)
                 if (inputState.jumping && mx >= GAME_CONFIG.width - 70 && mx <= GAME_CONFIG.width - 20 &&
@@ -4090,6 +4263,7 @@
                         if (ability2.type === 'springCoin') gameState.abilityState.springCoinTimer = 0;
                         if (ability2.type === 'summerCoin') gameState.abilityState.seasonCoinTimer = 0;
                         if (ability2.type === 'autumnWinterCoin') gameState.abilityState.seasonCoinTimer = 0;
+                        if (ability2.type === 'fartBoost') gameState.abilityState.fartCharges = ability2.charges;
                     }
                     if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                     if (typeof engine !== 'undefined' && engine.scenes) {
@@ -4534,7 +4708,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.8.3';
+        const GAME_VERSION = 'v3.9.0';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
