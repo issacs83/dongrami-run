@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.8.0';
+        var CURRENT_VER = 'v3.8.1';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -793,6 +793,7 @@
             bgmVolume: parseFloat(localStorage.getItem('bgmVolume')) || 1.0,   // 0~1
             sfxVolume: parseFloat(localStorage.getItem('sfxVolume')) || 1.0,    // 0~1
             bgmMuted: localStorage.getItem('bgmMuted') === 'true',
+            abilityState: {},  // 캐릭터 능력 상태 (게임 시작 시 초기화)
         };
 
         // ============================================================================
@@ -2832,7 +2833,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.8.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.8.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -2858,6 +2859,8 @@
                     gameState.currentScene = 'game';
                     gameState.isRunning = true;
                     gameState.isPaused = false;
+                    gameState.endingTriggered = false;
+                    gameState.hitFlashTimer = 0;
                     gameState.gameStartTime = Date.now();
                     // 캐릭터 능력 상태 초기화
                     gameState.abilityState = {};
@@ -3517,8 +3520,8 @@
                         } else if (gameState.invulnTimer <= 0) {
                             // 삼각미 능력: 피격 무시 (3회)
                             if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'hitIgnore' &&
-                                gameState.abilityState.hitIgnoreLeft > 0) {
-                                gameState.abilityState.hitIgnoreLeft--;
+                                (gameState.abilityState?.hitIgnoreLeft || 0) > 0) {
+                                gameState.abilityState.hitIgnoreLeft = (gameState.abilityState.hitIgnoreLeft || 0) - 1;
                                 gameState.invulnTimer = 1.0; // 짧은 무적
                                 this.particles.createExplosion(obstacle.x, obstacle.y, '#4CAF50', 15);
                                 this.obstacles = this.obstacles.filter(o => o !== obstacle);
@@ -3634,7 +3637,7 @@
 
                 // 캐릭터 능력 HUD 표시
                 const abilityType = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
-                if (abilityType === 'hitIgnore' && gameState.abilityState.hitIgnoreLeft > 0) {
+                if (abilityType === 'hitIgnore' && gameState.abilityState?.hitIgnoreLeft > 0) {
                     ctx.fillStyle = '#4CAF50';
                     ctx.font = 'bold 14px Arial';
                     ctx.textAlign = 'left';
@@ -4042,6 +4045,8 @@
                     gameState.currentScene = 'game';
                     gameState.isRunning = true;
                     gameState.isPaused = false;
+                    gameState.endingTriggered = false;
+                    gameState.hitFlashTimer = 0;
                     gameState.gameStartTime = Date.now();
                     // 캐릭터 능력 상태 초기화
                     gameState.abilityState = {};
@@ -4326,73 +4331,88 @@
             }
 
             gameLoop(timestamp) {
-                if (!this.lastTime) this.lastTime = timestamp;
-                const deltaTime = Math.min((timestamp - this.lastTime), 33) / 1000;
-                this.lastTime = timestamp;
+                try {
+                    if (!this.lastTime) this.lastTime = timestamp;
+                    const deltaTime = Math.min((timestamp - this.lastTime), 33) / 1000;
+                    this.lastTime = timestamp;
 
-                // 씬 전환 감지 → 입력 클리어
-                if (gameState.currentScene !== this.prevScene) {
-                    inputManager.lastTouchX = undefined;
-                    inputManager.lastTouchY = undefined;
-                    inputManager.jumping = false;
-                    inputManager.jumpPressed = false;
-                    this.prevScene = gameState.currentScene;
+                    // 씬 전환 감지 → 입력 클리어
+                    if (gameState.currentScene !== this.prevScene) {
+                        inputManager.lastTouchX = undefined;
+                        inputManager.lastTouchY = undefined;
+                        inputManager.jumping = false;
+                        inputManager.jumpPressed = false;
+                        this.prevScene = gameState.currentScene;
+                    }
+
+                    // Update
+                    const inputState = inputManager.getInputState();
+
+                    if (gameState.currentScene === 'title') {
+                        this.scenes.title.update(deltaTime);
+                        this.scenes.title.handleInput(inputState);
+                    } else if (gameState.currentScene === 'select') {
+                        this.scenes.select.update(deltaTime);
+                        this.scenes.select.handleInput(inputState);
+                    } else if (gameState.currentScene === 'settings') {
+                        this.scenes.settings.update(deltaTime);
+                        this.scenes.settings.handleInput(inputState);
+                    } else if (gameState.currentScene === 'game') {
+                        if (!this.scenes.game) {
+                            this.scenes.game = new GameScene();
+                        }
+                        if (gameState.isRunning) {
+                            this.scenes.game.update(inputState, deltaTime);
+                            this.scenes.game.handleInput(inputState);
+                        }
+                    } else if (gameState.currentScene === 'gameOver') {
+                        if (!this.scenes.gameOver) {
+                            this.scenes.gameOver = new GameOverScene();
+                        }
+                        this.scenes.gameOver.update(deltaTime);
+                        this.scenes.gameOver.handleInput(inputState);
+                    } else if (gameState.currentScene === 'ending') {
+                        if (!this.scenes.ending) {
+                            this.scenes.ending = new EndingScene();
+                        }
+                        this.scenes.ending.update(deltaTime);
+                        this.scenes.ending.handleInput(inputState);
+                    }
+
+                    // Draw
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                    if (gameState.currentScene === 'title') {
+                        this.scenes.title.draw(this.ctx);
+                    } else if (gameState.currentScene === 'select') {
+                        this.scenes.select.draw(this.ctx);
+                    } else if (gameState.currentScene === 'settings') {
+                        this.scenes.settings.draw(this.ctx);
+                    } else if (gameState.currentScene === 'game' && this.scenes.game) {
+                        this.scenes.game.draw(this.ctx);
+                        this.scenes.game.drawPauseScreen(this.ctx);
+                    } else if (gameState.currentScene === 'gameOver' && this.scenes.gameOver) {
+                        this.scenes.gameOver.draw(this.ctx);
+                    } else if (gameState.currentScene === 'ending' && this.scenes.ending) {
+                        this.scenes.ending.draw(this.ctx);
+                    }
+
+                    // 매 프레임 점프 입력 리셋 (모든 씬에서)
+                    inputManager.resetJump();
+                } catch(e) {
+                    console.error('게임 루프 에러:', e);
+                    // 에러 발생 시 화면에 표시 (디버그)
+                    this.ctx.fillStyle = 'rgba(0,0,0,0.85)';
+                    this.ctx.fillRect(0, 0, GAME_CONFIG.width, 80);
+                    this.ctx.fillStyle = '#FF4444';
+                    this.ctx.font = 'bold 16px monospace';
+                    this.ctx.textAlign = 'left';
+                    this.ctx.fillText('ERROR: ' + e.message, 10, 25);
+                    this.ctx.fillStyle = '#FFAA00';
+                    this.ctx.font = '12px monospace';
+                    this.ctx.fillText(e.stack ? e.stack.split('\n')[1] : '', 10, 50);
+                    this.ctx.fillText('Scene: ' + gameState.currentScene + ' | Running: ' + gameState.isRunning, 10, 70);
                 }
-
-                // Update
-                const inputState = inputManager.getInputState();
-
-                if (gameState.currentScene === 'title') {
-                    this.scenes.title.update(deltaTime);
-                    this.scenes.title.handleInput(inputState);
-                } else if (gameState.currentScene === 'select') {
-                    this.scenes.select.update(deltaTime);
-                    this.scenes.select.handleInput(inputState);
-                } else if (gameState.currentScene === 'settings') {
-                    this.scenes.settings.update(deltaTime);
-                    this.scenes.settings.handleInput(inputState);
-                } else if (gameState.currentScene === 'game') {
-                    if (!this.scenes.game) {
-                        this.scenes.game = new GameScene();
-                    }
-                    if (gameState.isRunning) {
-                        this.scenes.game.update(inputState, deltaTime);
-                        this.scenes.game.handleInput(inputState);
-                    }
-                } else if (gameState.currentScene === 'gameOver') {
-                    if (!this.scenes.gameOver) {
-                        this.scenes.gameOver = new GameOverScene();
-                    }
-                    this.scenes.gameOver.update(deltaTime);
-                    this.scenes.gameOver.handleInput(inputState);
-                } else if (gameState.currentScene === 'ending') {
-                    if (!this.scenes.ending) {
-                        this.scenes.ending = new EndingScene();
-                    }
-                    this.scenes.ending.update(deltaTime);
-                    this.scenes.ending.handleInput(inputState);
-                }
-
-                // Draw
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-                if (gameState.currentScene === 'title') {
-                    this.scenes.title.draw(this.ctx);
-                } else if (gameState.currentScene === 'select') {
-                    this.scenes.select.draw(this.ctx);
-                } else if (gameState.currentScene === 'settings') {
-                    this.scenes.settings.draw(this.ctx);
-                } else if (gameState.currentScene === 'game' && this.scenes.game) {
-                    this.scenes.game.draw(this.ctx);
-                    this.scenes.game.drawPauseScreen(this.ctx);
-                } else if (gameState.currentScene === 'gameOver' && this.scenes.gameOver) {
-                    this.scenes.gameOver.draw(this.ctx);
-                } else if (gameState.currentScene === 'ending' && this.scenes.ending) {
-                    this.scenes.ending.draw(this.ctx);
-                }
-
-                // 매 프레임 점프 입력 리셋 (모든 씬에서)
-                inputManager.resetJump();
 
                 this.run();
             }
@@ -4480,7 +4500,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.8.0';
+        const GAME_VERSION = 'v3.8.1';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
