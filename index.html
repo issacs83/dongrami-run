@@ -405,6 +405,90 @@
                     },
                     cost: 500,
                     hitbox: { offsetX: 10, offsetY: 10, width: 44, height: 44 }
+                },
+
+                김여름: {
+                    name: '김여름',
+                    colors: { main: '#FFD700', secondary: '#FF8C00' },
+                    size: 64,
+                    hidden: true, // 히든 캐릭터
+                    drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                        ctx.save();
+                        ctx.translate(x + 32, y + 32);
+                        const glow = 1 + Math.sin(frameIndex * 0.15) * 0.08;
+                        ctx.scale(glow, glow);
+
+                        // 태양 광선 (8개, 회전)
+                        const rayAngle = frameIndex * 0.03;
+                        ctx.fillStyle = '#FFD700';
+                        for (let i = 0; i < 8; i++) {
+                            const angle = rayAngle + (i * Math.PI / 4);
+                            ctx.save();
+                            ctx.rotate(angle);
+                            ctx.beginPath();
+                            ctx.moveTo(-5, -20);
+                            ctx.lineTo(0, -32);
+                            ctx.lineTo(5, -20);
+                            ctx.closePath();
+                            ctx.fill();
+                            ctx.restore();
+                        }
+
+                        // 태양 본체 (그라데이션)
+                        const sunGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 22);
+                        sunGrad.addColorStop(0, '#FFEE44');
+                        sunGrad.addColorStop(0.6, '#FFD700');
+                        sunGrad.addColorStop(1, '#FF8C00');
+                        ctx.fillStyle = sunGrad;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // 태양 테두리
+                        ctx.strokeStyle = '#FF6600';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        // 선글라스 (쿨한 히든 캐릭터)
+                        ctx.fillStyle = '#222222';
+                        ctx.beginPath();
+                        ctx.roundRect(-16, -10, 12, 8, 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.roundRect(4, -10, 12, 8, 2);
+                        ctx.fill();
+                        // 선글라스 다리
+                        ctx.strokeStyle = '#222222';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(-4, -6);
+                        ctx.lineTo(4, -6);
+                        ctx.stroke();
+
+                        // 자신감 넘치는 미소
+                        ctx.strokeStyle = '#CC4400';
+                        ctx.lineWidth = 2.5;
+                        ctx.beginPath();
+                        ctx.arc(0, 4, 8, 0.1, Math.PI - 0.1, false);
+                        ctx.stroke();
+
+                        // 점프 시 불꽃 이펙트
+                        if (isJumping) {
+                            ctx.fillStyle = 'rgba(255,100,0,0.6)';
+                            for (let i = 0; i < 5; i++) {
+                                const fa = (frameIndex * 0.1 + i * 1.2);
+                                const fx = Math.cos(fa) * 28;
+                                const fy = Math.sin(fa) * 28;
+                                ctx.beginPath();
+                                ctx.arc(fx, fy, 3, 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                        }
+
+                        ctx.restore();
+                    },
+                    cost: 1000,
+                    hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
                 }
             }
         };
@@ -441,6 +525,8 @@
             })(),
             gameStartTime: 0,
             gameTime: 0,
+            winterCount: 0,      // 겨울을 지난 횟수
+            seasonLevel: 0,      // 겨울 통과 보너스 레벨 (0.5씩 증가)
         };
 
         // ============================================================================
@@ -536,6 +622,325 @@
                     osc.start(now + i * 0.05);
                     osc.stop(now + i * 0.05 + 0.1);
                 });
+            }
+
+            playSeasonChangeSound(season) {
+                if (!this.audioContext) return;
+                const now = this.audioContext.currentTime;
+                const chords = {
+                    spring: [523, 659, 784], // C E G (밝은 메이저)
+                    summer: [587, 740, 880], // D F# A (활기찬)
+                    autumn: [440, 523, 659], // A C E (차분한 마이너)
+                    winter: [392, 494, 587]  // G B D (서정적)
+                };
+                const chord = chords[season] || chords.spring;
+                chord.forEach((freq, i) => {
+                    const osc = this.audioContext.createOscillator();
+                    const gain = this.audioContext.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0, now);
+                    gain.gain.linearRampToValueAtTime(0.12, now + 0.15);
+                    gain.gain.linearRampToValueAtTime(0.08, now + 0.8);
+                    gain.gain.linearRampToValueAtTime(0, now + 1.5);
+                    osc.connect(gain);
+                    gain.connect(this.masterGain);
+                    osc.start(now + i * 0.08);
+                    osc.stop(now + 1.6);
+                });
+            }
+        }
+
+        // ============================================================================
+        // SEASONAL BGM SYSTEM - 계절별 프로시저럴 배경음악
+        // ============================================================================
+        class SeasonalBGM {
+            constructor(audioManager) {
+                this.am = audioManager;
+                this.currentSeason = null;
+                this.bgmNodes = []; // 현재 재생 중인 노드들
+                this.bgmGain = null; // BGM 전용 gain
+                this.fadeGain = null; // 크로스페이드용 gain
+                this.nextBeatTime = 0;
+                this.beatIndex = 0;
+                this.bpm = 120;
+                this.isPlaying = false;
+                this.targetVolume = 0.10; // BGM 볼륨 (효과음보다 낮게)
+                this.seasonTransitionOverlay = null; // { season, timer, maxTime }
+
+                // 계절별 음악 패턴 정의
+                this.patterns = {
+                    spring: {
+                        // 봄: 밝고 경쾌한 멜로디 (C 메이저, 빠른 템포)
+                        bpm: 138,
+                        scale: [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25],
+                        melody: [0,2,4,5, 4,2,3,4, 5,4,2,0, 2,4,5,7],
+                        bass: [0,0,3,3, 5,5,4,4],
+                        waveType: 'triangle',
+                        bassType: 'sine',
+                        melodyVol: 0.09,
+                        bassVol: 0.05,
+                        arpeggio: true
+                    },
+                    summer: {
+                        // 여름: 활기차고 리드미컬 (D 메이저, 가장 빠름)
+                        bpm: 150,
+                        scale: [293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 554.37, 587.33],
+                        melody: [0,4,2,5, 7,5,4,2, 0,2,4,7, 5,4,2,0],
+                        bass: [0,0,4,4, 5,5,2,2],
+                        waveType: 'square',
+                        bassType: 'triangle',
+                        melodyVol: 0.06,
+                        bassVol: 0.04,
+                        arpeggio: false
+                    },
+                    autumn: {
+                        // 가을: 차분하고 서정적 (A 마이너, 느린 템포)
+                        bpm: 108,
+                        scale: [220.00, 246.94, 261.63, 293.66, 329.63, 349.23, 392.00, 440.00],
+                        melody: [0,2,4,7, 5,4,2,0, 3,5,7,5, 4,2,0,2],
+                        bass: [0,0,3,3, 5,5,4,4],
+                        waveType: 'triangle',
+                        bassType: 'sine',
+                        melodyVol: 0.08,
+                        bassVol: 0.05,
+                        arpeggio: false
+                    },
+                    winter: {
+                        // 겨울: 고요하고 신비로운 (E 마이너, 가장 느림)
+                        bpm: 96,
+                        scale: [164.81, 185.00, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63],
+                        melody: [0,3,5,7, 5,3,2,0, 4,5,7,5, 3,2,0,3],
+                        bass: [0,0,2,2, 4,4,3,3],
+                        waveType: 'sine',
+                        bassType: 'sine',
+                        melodyVol: 0.08,
+                        bassVol: 0.06,
+                        arpeggio: true
+                    }
+                };
+            }
+
+            start(season) {
+                if (!this.am.audioContext) return;
+                this.isPlaying = true;
+                this.currentSeason = season;
+                this.beatIndex = 0;
+                this._ensureGain();
+                this.bgmGain.gain.setValueAtTime(this.targetVolume, this.am.audioContext.currentTime);
+                this.nextBeatTime = this.am.audioContext.currentTime + 0.1;
+            }
+
+            stop() {
+                this.isPlaying = false;
+                if (this.bgmGain && this.am.audioContext) {
+                    try {
+                        this.bgmGain.gain.linearRampToValueAtTime(0, this.am.audioContext.currentTime + 0.5);
+                    } catch(e) {}
+                }
+            }
+
+            _ensureGain() {
+                if (!this.bgmGain || !this.am.audioContext) {
+                    if (!this.am.audioContext) return;
+                    this.bgmGain = this.am.audioContext.createGain();
+                    this.bgmGain.gain.value = this.targetVolume;
+                    this.bgmGain.connect(this.am.masterGain);
+                }
+            }
+
+            changeSeason(newSeason) {
+                if (!this.am.audioContext || newSeason === this.currentSeason) return;
+                const ctx = this.am.audioContext;
+                const now = ctx.currentTime;
+
+                // 크로스페이드: 현재 음악 페이드아웃
+                if (this.bgmGain) {
+                    this.bgmGain.gain.cancelScheduledValues(now);
+                    this.bgmGain.gain.setValueAtTime(this.bgmGain.gain.value, now);
+                    this.bgmGain.gain.linearRampToValueAtTime(0, now + 1.5);
+                }
+
+                // 새 gain 노드 생성해서 페이드인
+                const oldGain = this.bgmGain;
+                this.bgmGain = ctx.createGain();
+                this.bgmGain.gain.setValueAtTime(0, now);
+                this.bgmGain.gain.linearRampToValueAtTime(this.targetVolume, now + 2.0);
+                this.bgmGain.connect(this.am.masterGain);
+
+                // 이전 gain은 2초 후 자동 정리
+                setTimeout(() => {
+                    try { oldGain.disconnect(); } catch(e) {}
+                }, 3000);
+
+                this.currentSeason = newSeason;
+                this.beatIndex = 0;
+                this.nextBeatTime = now + 0.5; // 크로스페이드 중 약간 딜레이 후 시작
+
+                // 계절 전환 오버레이 설정
+                this.seasonTransitionOverlay = { season: newSeason, timer: 4.0, maxTime: 4.0 };
+
+                // 전환 효과음
+                this.am.playSeasonChangeSound(newSeason);
+            }
+
+            update(deltaTime) {
+                if (!this.isPlaying || !this.am.audioContext) return;
+                const ctx = this.am.audioContext;
+                const now = ctx.currentTime;
+                const pattern = this.patterns[this.currentSeason];
+                if (!pattern) return;
+
+                const beatDuration = 60 / pattern.bpm;
+
+                // 스케줄링: 현재 시간보다 앞선 비트들을 예약
+                while (this.nextBeatTime < now + 0.2) {
+                    this._playBeat(pattern, this.nextBeatTime, beatDuration);
+                    this.beatIndex = (this.beatIndex + 1) % pattern.melody.length;
+                    this.nextBeatTime += beatDuration;
+                }
+
+                // 오버레이 타이머 업데이트
+                if (this.seasonTransitionOverlay) {
+                    this.seasonTransitionOverlay.timer -= deltaTime;
+                    if (this.seasonTransitionOverlay.timer <= 0) {
+                        this.seasonTransitionOverlay = null;
+                    }
+                }
+            }
+
+            _playBeat(pattern, time, duration) {
+                if (!this.am.audioContext) return;
+                const ctx = this.am.audioContext;
+                this._ensureGain();
+
+                // 멜로디 노트
+                const noteIdx = pattern.melody[this.beatIndex];
+                const freq = pattern.scale[noteIdx];
+
+                if (pattern.arpeggio && this.beatIndex % 2 === 0) {
+                    // 아르페지오: 2개 음을 빠르게
+                    const freq2 = pattern.scale[Math.min(noteIdx + 2, pattern.scale.length - 1)];
+                    this._playNote(freq, time, duration * 0.45, pattern.waveType, pattern.melodyVol);
+                    this._playNote(freq2, time + duration * 0.5, duration * 0.45, pattern.waveType, pattern.melodyVol * 0.7);
+                } else {
+                    this._playNote(freq, time, duration * 0.8, pattern.waveType, pattern.melodyVol);
+                }
+
+                // 베이스 (4비트마다)
+                if (this.beatIndex % 2 === 0) {
+                    const bassIdx = pattern.bass[Math.floor(this.beatIndex / 2) % pattern.bass.length];
+                    const bassFreq = pattern.scale[bassIdx] / 2; // 옥타브 아래
+                    this._playNote(bassFreq, time, duration * 1.8, pattern.bassType, pattern.bassVol);
+                }
+            }
+
+            _playNote(freq, time, duration, waveType, volume) {
+                const ctx = this.am.audioContext;
+                if (!ctx || !this.bgmGain) return;
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = waveType;
+                osc.frequency.setValueAtTime(freq, time);
+
+                // 부드러운 어택/릴리즈 (ADSR)
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(volume, time + 0.02);
+                gain.gain.setValueAtTime(volume, time + duration * 0.6);
+                gain.gain.linearRampToValueAtTime(0, time + duration);
+
+                osc.connect(gain);
+                gain.connect(this.bgmGain);
+                osc.start(time);
+                osc.stop(time + duration + 0.05);
+            }
+
+            // 계절 전환 오버레이 그리기
+            drawOverlay(ctx) {
+                if (!this.seasonTransitionOverlay) return;
+
+                const ov = this.seasonTransitionOverlay;
+                const progress = 1 - (ov.timer / ov.maxTime); // 0→1
+                const fadeIn = Math.min(1, progress * 3); // 처음 0.33 동안 페이드인
+                const fadeOut = Math.min(1, ov.timer / 1.0); // 마지막 1초 페이드아웃
+                const alpha = Math.min(fadeIn, fadeOut);
+
+                if (alpha <= 0.01) return;
+
+                const W = GAME_CONFIG.width;
+                const H = GAME_CONFIG.height;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+
+                // 계절별 오버레이 색상 + 이모지
+                const overlayColors = {
+                    spring: { top: 'rgba(255,192,203,0.25)', bot: 'rgba(255,255,255,0.05)', emoji: '🌸', text: '봄이 왔어요!', particles: '🌷🌼🦋' },
+                    summer: { top: 'rgba(255,200,0,0.20)', bot: 'rgba(135,206,235,0.05)', emoji: '☀️', text: '여름이 왔어요!', particles: '🌻🌊🦎' },
+                    autumn: { top: 'rgba(255,140,0,0.25)', bot: 'rgba(139,69,19,0.05)', emoji: '🍂', text: '가을이 왔어요!', particles: '🍁🌰🍄' },
+                    winter: { top: 'rgba(100,149,237,0.25)', bot: 'rgba(255,255,255,0.10)', emoji: '❄️', text: '겨울이 왔어요!', particles: '⛄🌨️💎' }
+                };
+                const oc = overlayColors[ov.season] || overlayColors.spring;
+
+                // 그라데이션 오버레이
+                const grad = ctx.createLinearGradient(0, 0, 0, H);
+                grad.addColorStop(0, oc.top);
+                grad.addColorStop(1, oc.bot);
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, W, H);
+
+                // 중앙 배너 (계절 배너보다 더 화려하게)
+                const bannerAlpha = alpha * 0.92;
+                ctx.globalAlpha = bannerAlpha;
+
+                const bw = 500, bh = 120;
+                const bx = W / 2 - bw / 2;
+                const by = H / 2 - bh / 2 - 30;
+
+                // 배너 배경 (그라데이션 + 둥근 모서리)
+                const bannerGrad = ctx.createLinearGradient(bx, by, bx, by + bh);
+                bannerGrad.addColorStop(0, 'rgba(0,0,0,0.75)');
+                bannerGrad.addColorStop(1, 'rgba(0,0,0,0.55)');
+                ctx.fillStyle = bannerGrad;
+                ctx.beginPath();
+                ctx.roundRect(bx, by, bw, bh, 20);
+                ctx.fill();
+
+                // 배너 테두리 (계절색)
+                const borderColors = { spring: '#FF69B4', summer: '#FFD700', autumn: '#FF8C00', winter: '#87CEEB' };
+                ctx.strokeStyle = borderColors[ov.season] || '#FFFFFF';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.roundRect(bx, by, bw, bh, 20);
+                ctx.stroke();
+
+                // 이모지 + 텍스트
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 44px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${oc.emoji} ${oc.text} ${oc.emoji}`, W / 2, by + bh * 0.45);
+
+                // 음표 아이콘 표시 (음악 바뀐다는 표시)
+                ctx.font = '20px Arial';
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillText(`♪ ♫ 배경음악이 바뀝니다 ♫ ♪`, W / 2, by + bh * 0.82);
+
+                // 떨어지는 파티클 이모지 (계절 분위기)
+                const particleEmojis = oc.particles.match(/./gu) || [];
+                ctx.font = '28px Arial';
+                const time = (ov.maxTime - ov.timer) * 2;
+                for (let i = 0; i < 8; i++) {
+                    const emoji = particleEmojis[i % particleEmojis.length];
+                    const px = (W * 0.1) + (i * W * 0.11) + Math.sin(time + i * 1.5) * 30;
+                    const py = ((time * 60 + i * 80) % (H + 40)) - 20;
+                    ctx.globalAlpha = bannerAlpha * 0.6;
+                    ctx.fillText(emoji, px, py);
+                }
+
+                ctx.restore();
             }
         }
 
@@ -1777,6 +2182,12 @@
                 ctx.font = '16px Arial';
                 ctx.fillText('탭 = 점프 / 더블탭 = 더블점프 / 아래 스와이프 = 숙이기', GAME_CONFIG.width/2, 465);
 
+                // 버전 표시 (우측 하단)
+                ctx.textAlign = 'right';
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.font = '13px Arial';
+                ctx.fillText('v2.0.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+
                 ctx.restore();
             }
 
@@ -1795,6 +2206,8 @@
                     gameState.lives = gameState.maxLives;
                     gameState.invulnTimer = 0;
                     gameState.speedLevel = 0;
+                    gameState.winterCount = 0;
+                    gameState.seasonLevel = 0;
                     gameState.gameSpeed = GAME_CONFIG.initialSpeed;
                     gameState.currentScene = 'game';
                     gameState.isRunning = true;
@@ -2015,6 +2428,11 @@
                 this.powerUpTimer = 8.0;
                 this.seasonBanner = null; // { text, timer }
                 this.lastSeason = 'spring';
+                this.prevSeasonForWinter = 'spring'; // 겨울→봄 전환 감지용
+                // BGM 시작
+                if (typeof seasonalBGM !== 'undefined') {
+                    seasonalBGM.start('spring');
+                }
             }
 
             update(inputState, deltaTime) {
@@ -2022,25 +2440,40 @@
 
                 this.background.update(deltaTime, gameState.score);
 
-                // 계절 전환 감지 → 배경의 실제 계절 상태를 기준으로 배너 표시
+                // 계절 전환 감지 → 배경의 실제 계절 상태를 기준으로 배너/BGM 전환
                 const bgSeason = this.background.currentSeason;
-                const bgReady = this.background.transitionT >= 0.5; // 전환이 50% 이상 진행되면 배너 표시
+                const bgReady = this.background.transitionT >= 0.5;
                 if (bgReady && bgSeason !== this.lastSeason) {
-                    const labels = { spring: '🌸 봄이 왔어요!', summer: '☀️ 여름이 왔어요!', autumn: '🍂 가을이 왔어요!', winter: '❄️ 겨울이 왔어요!' };
-                    this.seasonBanner = { text: labels[bgSeason], timer: 3.0 };
+                    // 시각 배너는 이제 BGM 오버레이로 대체 (seasonalBGM.drawOverlay)
                     this.lastSeason = bgSeason;
+
+                    // BGM 계절 전환 (크로스페이드 + 오버레이)
+                    if (typeof seasonalBGM !== 'undefined') {
+                        seasonalBGM.changeSeason(bgSeason);
+                    }
                 }
-                if (this.seasonBanner && this.seasonBanner.timer > 0) {
-                    this.seasonBanner.timer -= deltaTime;
+
+                // 겨울 → 봄 전환 감지: 겨울을 완전히 지남 = 레벨 0.5 증가
+                const rawSeason = getCurrentSeason(gameState.score || 0);
+                if (this.prevSeasonForWinter === 'winter' && rawSeason === 'spring') {
+                    gameState.winterCount++;
+                    gameState.seasonLevel = gameState.winterCount * 0.5;
+                }
+                this.prevSeasonForWinter = rawSeason;
+
+                // BGM 업데이트
+                if (typeof seasonalBGM !== 'undefined') {
+                    seasonalBGM.update(deltaTime);
                 }
 
                 this.player.update(inputState, deltaTime);
                 this.particles.update(deltaTime);
 
-                // Update speed & level (0~100)
+                // Update speed & level (0~100) + 계절 레벨 보너스 적용
+                const seasonSpeedBonus = gameState.seasonLevel * 15; // 겨울 1회 통과마다 속도 +7.5
                 gameState.gameSpeed = Math.min(
                     GAME_CONFIG.maxSpeed,
-                    GAME_CONFIG.initialSpeed + gameState.score * GAME_CONFIG.speedIncrease
+                    GAME_CONFIG.initialSpeed + gameState.score * GAME_CONFIG.speedIncrease + seasonSpeedBonus
                 );
                 gameState.speedLevel = Math.min(100, Math.floor(
                     ((gameState.gameSpeed - GAME_CONFIG.initialSpeed) / (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed)) * 100
@@ -2165,6 +2598,7 @@
                                 gameState.isRunning = false;
                                 gameState.currentScene = 'gameOver';
                                 audioManager.playGameOverSound();
+                                if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                             }
                         }
                     }
@@ -2220,6 +2654,13 @@
                 ctx.fillStyle = gameState.speedLevel >= 80 ? '#FF2200' : gameState.speedLevel >= 50 ? '#FF8800' : '#0066CC';
                 ctx.fillText(`⚡ LV.${gameState.speedLevel}`, 230, 22);
 
+                // 계절 레벨 표시 (겨울 통과 보너스)
+                if (gameState.seasonLevel > 0) {
+                    ctx.font = 'bold 18px Arial';
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillText(`🌍 계절 +${gameState.seasonLevel.toFixed(1)}`, 370, 24);
+                }
+
                 ctx.fillStyle = '#000000';
                 ctx.font = 'bold 24px Arial';
                 ctx.fillText(`동전: ${gameState.coins}`, 20, 60);
@@ -2249,29 +2690,9 @@
                     ctx.fillRect(0, 0, GAME_CONFIG.width, 5);
                 }
 
-                // 계절 전환 배너
-                if (this.seasonBanner && this.seasonBanner.timer > 0) {
-                    ctx.save();
-                    const alpha = Math.min(1, this.seasonBanner.timer / 0.5); // 마지막 0.5초 페이드아웃
-                    ctx.globalAlpha = alpha;
-
-                    // 배너 배경
-                    const bw = 400, bh = 70;
-                    const bx = GAME_CONFIG.width / 2 - bw / 2;
-                    const by = 120;
-                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                    ctx.beginPath();
-                    ctx.roundRect(bx, by, bw, bh, 16);
-                    ctx.fill();
-
-                    // 배너 텍스트
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.font = 'bold 36px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(this.seasonBanner.text, GAME_CONFIG.width / 2, by + bh / 2);
-
-                    ctx.restore();
+                // 계절 전환 오버레이 (BGM 크로스페이드 + 시각 효과)
+                if (typeof seasonalBGM !== 'undefined') {
+                    seasonalBGM.drawOverlay(ctx);
                 }
             }
 
@@ -2309,6 +2730,8 @@
                 // 도달한 계절
                 const seasonLabels = { spring: '봄 🌸', summer: '여름 ☀️', autumn: '가을 🍂', winter: '겨울 ❄️' };
                 this.reachedSeason = seasonLabels[getCurrentSeason(this.finalScore)] || '봄 🌸';
+                this.finalWinterCount = gameState.winterCount;
+                this.finalSeasonLevel = gameState.seasonLevel;
 
                 // 입력 차단: 2초 동안 버튼 비활성 + 터치 좌표 초기화
                 this.inputDelay = 2.0;
@@ -2454,6 +2877,19 @@
                 ctx.font = 'bold 22px Arial';
                 ctx.fillText(this.reachedSeason, px + pw - 60, ly);
 
+                // 겨울 통과 횟수 & 계절 레벨
+                if (this.finalWinterCount > 0) {
+                    ly += lineH;
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#444';
+                    ctx.font = '22px Arial';
+                    ctx.fillText('겨울 통과', px + 60, ly);
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = '#4488CC';
+                    ctx.font = 'bold 22px Arial';
+                    ctx.fillText(`${this.finalWinterCount}회 (레벨 +${this.finalSeasonLevel.toFixed(1)})`, px + pw - 60, ly);
+                }
+
                 // 속도 레벨
                 ly += lineH;
                 ctx.textAlign = 'left';
@@ -2542,11 +2978,14 @@
                     gameState.lives = gameState.maxLives;
                     gameState.invulnTimer = 0;
                     gameState.speedLevel = 0;
+                    gameState.winterCount = 0;
+                    gameState.seasonLevel = 0;
                     gameState.gameSpeed = GAME_CONFIG.initialSpeed;
                     gameState.currentScene = 'game';
                     gameState.isRunning = true;
                     gameState.isPaused = false;
                     gameState.gameStartTime = Date.now();
+                    if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
                         engine.scenes.gameOver = null;
@@ -2556,6 +2995,7 @@
                 else if (mx >= menuX && mx <= menuX + btnW && my >= btnY && my <= btnY + btnH) {
                     gameState.currentScene = 'title';
                     gameState.isRunning = false;
+                    if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
                         engine.scenes.gameOver = null;
@@ -2676,8 +3116,23 @@
         }
 
         const audioManager = new AudioManager();
+        const seasonalBGM = new SeasonalBGM(audioManager);
         const inputManager = new InputManager();
         const engine = new GameEngine(canvas);
+
+        // AudioContext 활성화 (사용자 인터랙션 필요)
+        document.addEventListener('touchstart', function resumeAudio() {
+            if (audioManager.audioContext && audioManager.audioContext.state === 'suspended') {
+                audioManager.audioContext.resume();
+            }
+            document.removeEventListener('touchstart', resumeAudio);
+        }, { once: true });
+        document.addEventListener('click', function resumeAudio() {
+            if (audioManager.audioContext && audioManager.audioContext.state === 'suspended') {
+                audioManager.audioContext.resume();
+            }
+            document.removeEventListener('click', resumeAudio);
+        }, { once: true });
 
         engine.run();
     </script>
