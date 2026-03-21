@@ -644,10 +644,71 @@
                 cost: 3000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
-            // 순서 재배치: 동그라미, 네모미, 별미, 삼각미, 김여름, 하트미, 동그라미하준
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준'];
+            // 골든 동그라미 (LV.100 달성 시 해금되는 전설 캐릭터)
+            const goldenDongrami = {
+                name: '골든동그라미', colors: { main: '#FFD700', secondary: '#DAA520' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const glow = 1 + Math.sin(frameIndex * 0.12) * 0.05;
+                    ctx.scale(glow, glow);
+                    // 황금 오라
+                    ctx.fillStyle = 'rgba(255,215,0,0.15)';
+                    ctx.beginPath(); ctx.arc(0, 0, 34, 0, Math.PI * 2); ctx.fill();
+                    // 골든 몸체
+                    const goldGrad = ctx.createRadialGradient(-3, -5, 3, 0, 0, 26);
+                    goldGrad.addColorStop(0, '#FFF8DC');
+                    goldGrad.addColorStop(0.4, '#FFD700');
+                    goldGrad.addColorStop(0.8, '#DAA520');
+                    goldGrad.addColorStop(1, '#B8860B');
+                    ctx.fillStyle = goldGrad;
+                    ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2;
+                    ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 12; ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    // 왕관
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.moveTo(-14, -24); ctx.lineTo(-10, -34); ctx.lineTo(-4, -26);
+                    ctx.lineTo(0, -36); ctx.lineTo(4, -26);
+                    ctx.lineTo(10, -34); ctx.lineTo(14, -24);
+                    ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = '#B8860B'; ctx.lineWidth = 1; ctx.stroke();
+                    // 왕관 보석
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath(); ctx.arc(0, -30, 2.5, 0, Math.PI * 2); ctx.fill();
+                    // 눈
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-9, -5, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -5, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(-7, -4, 3.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(11, -4, 3.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, -6, 1.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(10, -6, 1.5, 0, Math.PI * 2); ctx.fill();
+                    // 미소
+                    ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.arc(0, 5, 11, 0.15, Math.PI - 0.15); ctx.stroke();
+                    // 반짝이 파티클
+                    if (isJumping) {
+                        ctx.fillStyle = '#FFD700';
+                        for (let i = 0; i < 6; i++) {
+                            const a = frameIndex * 0.12 + i * 1.05;
+                            const r = 30 + Math.sin(a) * 5;
+                            ctx.globalAlpha = 0.6;
+                            ctx.beginPath(); ctx.arc(Math.cos(a)*r, Math.sin(a)*r, 2, 0, Math.PI*2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 0, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
+            // 순서 재배치
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -676,6 +737,7 @@
             speedLevel: 0,
             isRunning: false,
             isPaused: false,
+            endingTriggered: false,
             currentScene: 'title',
             selectedCharacter: (() => {
                 const saved = localStorage.getItem('selectedCharacter');
@@ -1455,11 +1517,68 @@
                 };
 
                 this.frameIndex = 0;
+                this.baseY = this.y; // 원래 Y 위치 저장
+                this.moveTimer = 0;  // 악당 패턴 타이머
+                this.movePhase = 0;  // 가시왕 멈춤/돌진 페이즈
+                this.dashSpeed = 0;  // 까미/가시왕 추가 속도
             }
 
-            update(gameSpeed, deltaTime) {
-                this.x -= gameSpeed;
+            update(gameSpeed, deltaTime, playerY) {
                 this.frameIndex += 0.1;
+                this.moveTimer += deltaTime || 0.016;
+
+                switch(this.type) {
+                    case 'villain-slime':
+                        // 삐뚤이: 통통 튀면서 이동
+                        this.x -= gameSpeed;
+                        this.y = this.baseY - Math.abs(Math.sin(this.moveTimer * 5)) * 30;
+                        break;
+
+                    case 'villain-cat':
+                        // 까미: 1.5배 빠른 돌진
+                        this.x -= gameSpeed * 1.5;
+                        break;
+
+                    case 'villain-flame':
+                        // 불꽃이: 사인파 비행 (위아래 물결)
+                        this.x -= gameSpeed;
+                        this.y = this.baseY + Math.sin(this.moveTimer * 3) * 40;
+                        break;
+
+                    case 'villain-spike':
+                        // 가시왕: 잠시 멈췄다가 빠르게 돌진
+                        if (this.movePhase === 0) {
+                            // 느리게 접근
+                            this.x -= gameSpeed * 0.4;
+                            if (this.x < GAME_CONFIG.width * 0.7) {
+                                this.movePhase = 1;
+                                this.dashSpeed = gameSpeed * 2.5;
+                            }
+                        } else {
+                            // 빠르게 돌진!
+                            this.x -= this.dashSpeed;
+                        }
+                        break;
+
+                    case 'villain-ghost':
+                        // 유령이: 위아래 떠다님 + 투명↔불투명 (draw에서 처리)
+                        this.x -= gameSpeed * 0.8;
+                        this.y = this.baseY + Math.sin(this.moveTimer * 2) * 35;
+                        break;
+
+                    case 'villain-dark':
+                        // 다크동: 플레이어를 향해 Y축 추적
+                        this.x -= gameSpeed * 1.1;
+                        if (playerY !== undefined) {
+                            this.y += (playerY - this.y) * 0.03;
+                        }
+                        break;
+
+                    default:
+                        // 일반 장애물: 기본 이동
+                        this.x -= gameSpeed;
+                        break;
+                }
             }
 
             getHitbox() {
@@ -2636,7 +2755,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.3.2', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.4.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3092,6 +3211,14 @@
                     GAME_CONFIG.initialSpeed + (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed) * Math.pow(t, 2.5)
                 );
 
+                // LV.100 도달 → 엔딩 씬으로 전환!
+                if (gameState.speedLevel >= 100 && !gameState.endingTriggered) {
+                    gameState.endingTriggered = true;
+                    gameState.isRunning = false;
+                    gameState.currentScene = 'ending';
+                    if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
+                }
+
                 // Spawn obstacles (deltaTime 기반 — 끊김 방지)
                 this.obstacleTimer -= deltaTime;
                 if (this.obstacleTimer <= 0) {
@@ -3099,11 +3226,18 @@
                     this.obstacleTimer = 2.5 + Math.random() * 2.5;
                 }
 
-                // Spawn coins
+                // Spawn coins (가끔 2~3개 묶음으로 등장)
                 this.coinTimer -= deltaTime;
                 if (this.coinTimer <= 0) {
                     if (Math.random() < 0.4) {
-                        this.coins.push(new Coin());
+                        const baseY = GAME_CONFIG.groundY - 110 - Math.random() * 80;
+                        const coinCount = Math.random() < 0.3 ? (Math.random() < 0.5 ? 3 : 2) : 1;
+                        for (let ci = 0; ci < coinCount; ci++) {
+                            const c = new Coin();
+                            c.x = GAME_CONFIG.width + ci * 45; // 간격 45px
+                            c.y = baseY;
+                            this.coins.push(c);
+                        }
                     }
                     this.coinTimer = 1.2 + Math.random() * 1.0;
                 }
@@ -3118,9 +3252,10 @@
                     this.powerUpTimer = 6.0 + Math.random() * 4.0;
                 }
 
-                // Update obstacles
+                // Update obstacles (다크동에게 플레이어 Y 전달)
+                const playerY = this.player.y;
                 this.obstacles = this.obstacles.filter(o => {
-                    o.update(gameState.gameSpeed, deltaTime);
+                    o.update(gameState.gameSpeed, deltaTime, playerY);
                     return o.x + o.width > 0;
                 });
 
@@ -3362,8 +3497,67 @@
             }
 
             handleInput(inputState) {
-                // Pause button hit detection (simplified)
-                // Would need mouse position tracking for real implementation
+                const mx = inputManager.lastTouchX;
+                const my = inputManager.lastTouchY;
+                if (mx === undefined || my === undefined) return;
+
+                // Pause 버튼 영역: (width-70, 20) ~ (width-20, 70)
+                if (inputState.jumping && mx >= GAME_CONFIG.width - 70 && mx <= GAME_CONFIG.width - 20 &&
+                    my >= 20 && my <= 70) {
+                    gameState.isPaused = !gameState.isPaused;
+                    inputManager.resetJump();
+                    return;
+                }
+
+                // 일시정지 중일 때 "계속하기" / "타이틀로" 버튼
+                if (gameState.isPaused && inputState.jumping) {
+                    const cx = GAME_CONFIG.width / 2;
+                    const cy = GAME_CONFIG.height / 2;
+                    // 계속하기 버튼
+                    if (mx >= cx - 100 && mx <= cx + 100 && my >= cy - 10 && my <= cy + 40) {
+                        gameState.isPaused = false;
+                        inputManager.resetJump();
+                        return;
+                    }
+                    // 타이틀로 버튼
+                    if (mx >= cx - 100 && mx <= cx + 100 && my >= cy + 50 && my <= cy + 100) {
+                        gameState.isPaused = false;
+                        gameState.isRunning = false;
+                        gameState.currentScene = 'title';
+                        if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
+                        inputManager.resetJump();
+                        return;
+                    }
+                }
+            }
+
+            drawPauseScreen(ctx) {
+                if (!gameState.isPaused) return;
+                // 어두운 오버레이
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+
+                const cx = GAME_CONFIG.width / 2;
+                const cy = GAME_CONFIG.height / 2;
+
+                // 일시정지 텍스트
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('⏸ 일시정지', cx, cy - 40);
+
+                // 계속하기 버튼
+                ctx.fillStyle = '#4CAF50';
+                ctx.beginPath(); ctx.roundRect(cx - 100, cy - 10, 200, 50, 12); ctx.fill();
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText('▶ 계속하기', cx, cy + 22);
+
+                // 타이틀로 버튼
+                ctx.fillStyle = '#666';
+                ctx.beginPath(); ctx.roundRect(cx - 100, cy + 50, 200, 50, 12); ctx.fill();
+                ctx.fillStyle = '#FFF';
+                ctx.fillText('🏠 타이틀로', cx, cy + 82);
             }
         }
 
@@ -3671,6 +3865,236 @@
         }
 
         // ============================================================================
+        // LV.100 ENDING SCENE
+        // ============================================================================
+        class EndingScene {
+            constructor() {
+                this.phase = 0; // 0: 다크동 등장, 1: 대결, 2: 승리, 3: 축하, 4: 골든 해금
+                this.timer = 0;
+                this.particles = [];
+                this.fireworks = [];
+                // 골든 동그라미 해금
+                if (!gameState.unlockedCharacters.includes('골든동그라미')) {
+                    gameState.unlockedCharacters.push('골든동그라미');
+                    localStorage.setItem('unlockedCharacters', JSON.stringify(gameState.unlockedCharacters));
+                }
+                // 최종 기록 저장
+                gameState.bestScore = Math.max(gameState.bestScore, Math.floor(gameState.score));
+                localStorage.setItem('bestScore', gameState.bestScore.toString());
+            }
+
+            update(deltaTime) {
+                this.timer += deltaTime;
+                // 페이즈 자동 전환
+                if (this.phase === 0 && this.timer > 3) { this.phase = 1; this.timer = 0; }
+                if (this.phase === 1 && this.timer > 3) { this.phase = 2; this.timer = 0; }
+                if (this.phase === 2 && this.timer > 3) { this.phase = 3; this.timer = 0; }
+
+                // 축하 불꽃놀이 파티클
+                if (this.phase >= 3) {
+                    if (Math.random() < 0.15) {
+                        const fx = Math.random() * GAME_CONFIG.width;
+                        const fy = Math.random() * GAME_CONFIG.height * 0.6;
+                        const colors = ['#FF4444', '#FFD700', '#44FF44', '#4488FF', '#FF44FF', '#FF8800'];
+                        for (let i = 0; i < 12; i++) {
+                            const angle = (i / 12) * Math.PI * 2;
+                            this.fireworks.push({
+                                x: fx, y: fy,
+                                vx: Math.cos(angle) * (2 + Math.random() * 3),
+                                vy: Math.sin(angle) * (2 + Math.random() * 3),
+                                life: 1.0,
+                                color: colors[Math.floor(Math.random() * colors.length)],
+                                size: 3 + Math.random() * 3
+                            });
+                        }
+                    }
+                    this.fireworks = this.fireworks.filter(p => {
+                        p.x += p.vx; p.y += p.vy; p.vy += 0.05;
+                        p.life -= 0.02; p.size *= 0.98;
+                        return p.life > 0;
+                    });
+                }
+            }
+
+            draw(ctx) {
+                const W = GAME_CONFIG.width;
+                const H = GAME_CONFIG.height;
+                const cx = W / 2;
+                const cy = H / 2;
+
+                // 배경 그라데이션
+                const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+                if (this.phase < 2) {
+                    bgGrad.addColorStop(0, '#1A1A2E'); bgGrad.addColorStop(1, '#16213E');
+                } else if (this.phase === 2) {
+                    const t = Math.min(this.timer / 2, 1);
+                    bgGrad.addColorStop(0, `rgb(${26 + 200*t}, ${26 + 150*t}, ${46 + 100*t})`);
+                    bgGrad.addColorStop(1, `rgb(${22 + 100*t}, ${33 + 100*t}, ${62 + 100*t})`);
+                } else {
+                    bgGrad.addColorStop(0, '#FFD700'); bgGrad.addColorStop(0.5, '#FF8C00'); bgGrad.addColorStop(1, '#FF4444');
+                }
+                ctx.fillStyle = bgGrad;
+                ctx.fillRect(0, 0, W, H);
+
+                ctx.textAlign = 'center';
+
+                if (this.phase === 0) {
+                    // 다크동 등장
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = 'bold 28px Arial';
+                    ctx.fillText('어둠 속에서 무언가 다가온다...', cx, cy - 80);
+
+                    // 다크동 실루엣 (커지면서 등장)
+                    const scale = Math.min(this.timer / 2, 1);
+                    ctx.save(); ctx.translate(cx, cy + 30); ctx.scale(scale * 2, scale * 2);
+                    const darkGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 26);
+                    darkGrad.addColorStop(0, '#34495E'); darkGrad.addColorStop(1, '#1A1A2E');
+                    ctx.fillStyle = darkGrad;
+                    ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#E74C3C'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath(); ctx.arc(-9, -5, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -5, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.font = 'bold 36px Arial';
+                    if (this.timer > 2) ctx.fillText('다크동', cx, cy + 100);
+
+                } else if (this.phase === 1) {
+                    // 대결 장면
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillText('"나를 이기고 전설이 되어라!"', cx, 60);
+
+                    // 동그라미 (왼쪽) vs 다크동 (오른쪽)
+                    // 동그라미
+                    ctx.save(); ctx.translate(cx - 120, cy);
+                    ctx.fillStyle = '#FF4444';
+                    ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, -5, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -5, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(-6, -4, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(10, -4, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+
+                    // VS
+                    const vsScale = 1 + Math.sin(this.timer * 3) * 0.2;
+                    ctx.save(); ctx.translate(cx, cy); ctx.scale(vsScale, vsScale);
+                    ctx.fillStyle = '#FFD700'; ctx.font = 'bold 48px Arial';
+                    ctx.fillText('VS', 0, 15); ctx.restore();
+
+                    // 다크동
+                    ctx.save(); ctx.translate(cx + 120, cy);
+                    const dk = ctx.createRadialGradient(0, 0, 5, 0, 0, 30);
+                    dk.addColorStop(0, '#34495E'); dk.addColorStop(1, '#1A1A2E');
+                    ctx.fillStyle = dk;
+                    ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#E74C3C'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath(); ctx.arc(-9, -5, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -5, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+
+                    // 빛 이펙트
+                    if (this.timer > 2) {
+                        ctx.fillStyle = `rgba(255,255,255,${(this.timer - 2)})`;
+                        ctx.fillRect(0, 0, W, H);
+                    }
+
+                } else if (this.phase === 2) {
+                    // 승리!
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = 'bold 50px Arial';
+                    ctx.fillText('승리!!', cx, cy - 40);
+
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillText('다크동을 물리쳤다!', cx, cy + 10);
+                    ctx.fillText(`최종 점수: ${Math.floor(gameState.score)}`, cx, cy + 50);
+
+                } else {
+                    // 축하 + 골든 동그라미 해금
+                    // 불꽃놀이 파티클
+                    this.fireworks.forEach(p => {
+                        ctx.globalAlpha = p.life;
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+                    });
+                    ctx.globalAlpha = 1;
+
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = 'bold 44px Arial';
+                    ctx.fillText('🏆 LV.100 달성! 🏆', cx, 80);
+
+                    ctx.font = 'bold 22px Arial';
+                    ctx.fillText('전설의 캐릭터가 해금되었습니다!', cx, 130);
+
+                    // 골든 동그라미 캐릭터 미리보기
+                    ctx.save(); ctx.translate(cx, cy + 10);
+                    const glow = 1 + Math.sin(this.timer * 2) * 0.1;
+                    ctx.scale(glow * 2, glow * 2);
+                    const goldGrad = ctx.createRadialGradient(-3, -5, 3, 0, 0, 26);
+                    goldGrad.addColorStop(0, '#FFF8DC');
+                    goldGrad.addColorStop(0.4, '#FFD700');
+                    goldGrad.addColorStop(0.8, '#DAA520');
+                    goldGrad.addColorStop(1, '#B8860B');
+                    ctx.fillStyle = goldGrad;
+                    ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 3;
+                    ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 20; ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    // 왕관
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.moveTo(-15, -24); ctx.lineTo(-12, -34); ctx.lineTo(-5, -26);
+                    ctx.lineTo(0, -38); ctx.lineTo(5, -26);
+                    ctx.lineTo(12, -34); ctx.lineTo(15, -24);
+                    ctx.closePath(); ctx.fill();
+                    // 눈
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, -5, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -5, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(-6, -4, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(10, -4, 3, 0, Math.PI * 2); ctx.fill();
+                    // 미소
+                    ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(0, 5, 10, 0.1, Math.PI - 0.1); ctx.stroke();
+                    ctx.restore();
+
+                    ctx.fillStyle = '#FFD700';
+                    ctx.font = 'bold 26px Arial';
+                    ctx.fillText('✨ 골든 동그라미 ✨', cx, cy + 90);
+
+                    // 타이틀 버튼
+                    if (this.timer > 2) {
+                        ctx.fillStyle = '#FFF';
+                        ctx.beginPath(); ctx.roundRect(cx - 90, H - 80, 180, 50, 12); ctx.fill();
+                        ctx.fillStyle = '#333';
+                        ctx.font = 'bold 20px Arial';
+                        ctx.fillText('타이틀로 돌아가기', cx, H - 50);
+                    }
+                }
+            }
+
+            handleInput(inputState) {
+                if (!inputState.jumping) return;
+                if (this.phase >= 3 && this.timer > 2) {
+                    const mx = inputManager.lastTouchX;
+                    const my = inputManager.lastTouchY;
+                    const cx = GAME_CONFIG.width / 2;
+                    if (mx >= cx - 90 && mx <= cx + 90 && my >= GAME_CONFIG.height - 80 && my <= GAME_CONFIG.height - 30) {
+                        gameState.currentScene = 'title';
+                        gameState.endingTriggered = false;
+                    }
+                }
+            }
+        }
+
+        // ============================================================================
         // GAME ENGINE
         // ============================================================================
         class GameEngine {
@@ -3682,7 +4106,8 @@
                     select: new SelectScene(),
                     settings: new SettingsScene(),
                     game: null,
-                    gameOver: null
+                    gameOver: null,
+                    ending: null
                 };
                 this.lastTime = 0; // rAF timestamp로 초기화됨
                 this.prevScene = 'title';
@@ -3732,6 +4157,12 @@
                     }
                     this.scenes.gameOver.update(deltaTime);
                     this.scenes.gameOver.handleInput(inputState);
+                } else if (gameState.currentScene === 'ending') {
+                    if (!this.scenes.ending) {
+                        this.scenes.ending = new EndingScene();
+                    }
+                    this.scenes.ending.update(deltaTime);
+                    this.scenes.ending.handleInput(inputState);
                 }
 
                 // Draw
@@ -3745,8 +4176,11 @@
                     this.scenes.settings.draw(this.ctx);
                 } else if (gameState.currentScene === 'game' && this.scenes.game) {
                     this.scenes.game.draw(this.ctx);
+                    this.scenes.game.drawPauseScreen(this.ctx);
                 } else if (gameState.currentScene === 'gameOver' && this.scenes.gameOver) {
                     this.scenes.gameOver.draw(this.ctx);
+                } else if (gameState.currentScene === 'ending' && this.scenes.ending) {
+                    this.scenes.ending.draw(this.ctx);
                 }
 
                 // 매 프레임 점프 입력 리셋 (모든 씬에서)
