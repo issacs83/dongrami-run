@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.8.1';
+        var CURRENT_VER = 'v3.8.2';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1438,7 +1438,7 @@
                     this.doubleJumpAvailable = true;
                     audioManager.playJumpSound();
                 } else if (inputState.jumping && this.doubleJumpAvailable && this.isJumping) {
-                    this.velocityY = GAME_CONFIG.jumpPower * jumpBoost;
+                    this.velocityY = GAME_CONFIG.jumpPower;
                     this.doubleJumpAvailable = false;
                     audioManager.playJumpSound();
                     // 별미 능력: 더블점프 시 코인+1
@@ -1455,11 +1455,24 @@
                 this.velocityY += GAME_CONFIG.gravity;
                 this.y += this.velocityY;
 
+                // NaN/무한값 안전장치
+                if (isNaN(this.y) || !isFinite(this.y)) {
+                    this.y = GAME_CONFIG.groundY - this.height;
+                    this.velocityY = 0;
+                    this.isJumping = false;
+                }
+
                 // Ground collision
                 if (this.y + this.height >= GAME_CONFIG.groundY) {
                     this.y = GAME_CONFIG.groundY - this.height;
                     this.velocityY = 0;
                     this.isJumping = false;
+                }
+
+                // 화면 위로 벗어남 방지
+                if (this.y < -this.height) {
+                    this.y = -this.height;
+                    this.velocityY = 0;
                 }
 
                 // Animation
@@ -2833,7 +2846,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.8.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.8.2', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4500,7 +4513,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.8.1';
+        const GAME_VERSION = 'v3.8.2';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
