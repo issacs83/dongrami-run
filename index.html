@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.9.6';
+        var CURRENT_VER = 'v3.9.7';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1854,9 +1854,9 @@
                 this.frameIndex += 0.1;
                 this.moveTimer += deltaTime || 0.016;
 
-                // ★ 매 순환마다 악당 속도 증가 (순환 1=1.1배, 2=1.2배 ...)
+                // ★ 매 순환마다 악당 속도 대폭 증가
                 const wc = gameState.winterCount || 0;
-                const hellBoost = 1 + wc * 0.1; // 순환마다 10%씩 속도 증가 (제한 없음!)
+                const hellBoost = 1 + wc * 0.2; // 순환마다 20% 속도 증가! (순환1=1.2, 순환2=1.4, 순환3=1.6 ...)
                 const sp = gameSpeed * hellBoost;
 
                 switch(this.type) {
@@ -3101,7 +3101,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.9.6', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.9.7', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3796,14 +3796,19 @@
                 // ═══════════════════════════════════════════════════════════
                 gameState.speedLevel = Math.min(100, Math.floor(gameState.winterCount / 5));
                 const t = gameState.speedLevel / 100; // 0~1
+                // 기본 속도 (레벨 기반)
+                const baseSpeed = GAME_CONFIG.initialSpeed + (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed) * Math.pow(t, 2.5);
+                // ★ 핵심: 매 순환마다 게임 속도 직접 +0.8 증가
+                // 순환0=4.5, 순환1=5.3, 순환2=6.1, 순환3=6.9, 순환4=7.7, 순환5=8.5 ...
+                const cycleSpeedBonus = (gameState.winterCount || 0) * 0.8;
                 gameState.gameSpeed = Math.min(
-                    GAME_CONFIG.maxSpeed,
-                    GAME_CONFIG.initialSpeed + (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed) * Math.pow(t, 2.5)
+                    GAME_CONFIG.maxSpeed * 1.5, // 최대 18까지 허용 (기존 12)
+                    baseSpeed + cycleSpeedBonus
                 );
                 // 천사 능력: 속도 부스트 (15% 빠르게)
                 const angelAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
                 if (angelAbility?.type === 'angelBlessing' && angelAbility.speedBoost) {
-                    gameState.gameSpeed = Math.min(GAME_CONFIG.maxSpeed * 1.1, gameState.gameSpeed * angelAbility.speedBoost);
+                    gameState.gameSpeed = Math.min(GAME_CONFIG.maxSpeed * 1.6, gameState.gameSpeed * angelAbility.speedBoost);
                 }
 
                 // LV.100 도달 → 엔딩 씬으로 전환!
@@ -3821,19 +3826,19 @@
                     this.spawnObstacle();
                     const wc = gameState.winterCount || 0;
 
-                    // 스폰 간격: 순환 0=2.5~5초, 1=2.0~3.5초, 2=1.5~2.5초, 3=1.2~2.0초 ...
-                    // 매 순환마다 0.4초씩 확 줄어듦 → 최소 0.3초
-                    const baseMin = Math.max(0.3, 2.5 - wc * 0.4);
-                    const baseRange = Math.max(0.3, 2.5 - wc * 0.35);
+                    // ★ 스폰 간격: 매 순환마다 확 줄어듦
+                    // 순환0=2.0~3.5초, 순환1=1.3~2.0초, 순환2=0.8~1.3초, 순환3=0.5~0.8초
+                    const baseMin = Math.max(0.25, 2.0 - wc * 0.5);
+                    const baseRange = Math.max(0.25, 1.5 - wc * 0.35);
                     this.obstacleTimer = baseMin + Math.random() * baseRange;
 
-                    // 순환 2회부터: 가끔 연속 2개 동시 스폰 (확률 증가)
-                    if (wc >= 2 && Math.random() < Math.min(0.5, wc * 0.1)) {
-                        setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 180);
+                    // 순환 1회부터: 연속 2개 동시 스폰 (확률 증가)
+                    if (wc >= 1 && Math.random() < Math.min(0.5, wc * 0.15)) {
+                        setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 150);
                     }
-                    // 순환 4회부터: 가끔 3개 연속 스폰
-                    if (wc >= 4 && Math.random() < Math.min(0.3, (wc - 3) * 0.08)) {
-                        setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 350);
+                    // 순환 3회부터: 3개 연속 스폰
+                    if (wc >= 3 && Math.random() < Math.min(0.35, (wc - 2) * 0.1)) {
+                        setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 300);
                     }
                 }
 
@@ -3885,8 +3890,8 @@
                 // Collision detection
                 this.checkCollisions(deltaTime);
 
-                // Score increment (초당 ~10점 + 순환마다 확실히 증가)
-                const scoreBoost = 1 + (gameState.winterCount || 0) * 0.15; // 순환마다 15% 증가
+                // Score increment (초당 ~10점 + 순환마다 25% 증가 → 계절 전환도 빨라짐)
+                const scoreBoost = 1 + (gameState.winterCount || 0) * 0.25;
                 gameState.score += deltaTime * 10 * scoreBoost;
             }
 
@@ -5173,7 +5178,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.9.6';
+        const GAME_VERSION = 'v3.9.7';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
