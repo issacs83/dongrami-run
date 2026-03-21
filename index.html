@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.9.0';
+        var CURRENT_VER = 'v3.9.1';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -2921,7 +2921,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.9.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.9.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3121,21 +3121,109 @@
                 this.bg = new Background();
                 this.message = '';
                 this.messageTimer = 0;
+                // 스크롤 시스템
+                this.scrollY = 0;
+                this.scrollVelocity = 0;
+                this.maxScroll = 0;
+                this.isDragging = false;
+                this.dragStartY = 0;
+                this.dragStartScroll = 0;
+                this.lastDragY = 0;
+                this.dragMoved = false; // 드래그 vs 탭 구분용
+                // 그리드 설정
+                this.cols = 3;
+                this.cellW = 160;
+                this.cellH = 170;
+                this.gridTop = 115; // 그리드 시작 Y (패널 내부 기준)
+                this.gridBottom = GAME_CONFIG.height - 130; // 그리드 끝 Y
+                this.gridClipH = this.gridBottom - this.gridTop; // 보이는 영역 높이
+                // 터치/마우스 스크롤 이벤트 등록
+                this._setupScrollListeners();
+            }
+
+            _setupScrollListeners() {
+                const canvas = document.getElementById('gameCanvas');
+                // 마우스 휠
+                this._wheelHandler = (e) => {
+                    if (gameState.currentScene !== 'select') return;
+                    this.scrollY += e.deltaY * 0.5;
+                    this._clampScroll();
+                    e.preventDefault();
+                };
+                canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
+
+                // 터치 스크롤 (캐릭터 그리드 영역 내 드래그)
+                this._touchStartHandler = (e) => {
+                    if (gameState.currentScene !== 'select') return;
+                    const rect = canvas.getBoundingClientRect();
+                    const sy = GAME_CONFIG.height / rect.height;
+                    const ty = (e.touches[0].clientY - rect.top) * sy;
+                    if (ty >= this.gridTop && ty <= this.gridBottom) {
+                        this.isDragging = true;
+                        this.dragStartY = e.touches[0].clientY;
+                        this.dragStartScroll = this.scrollY;
+                        this.lastDragY = e.touches[0].clientY;
+                        this.dragMoved = false;
+                        this.scrollVelocity = 0;
+                    }
+                };
+                this._touchMoveHandler = (e) => {
+                    if (!this.isDragging || gameState.currentScene !== 'select') return;
+                    const dy = e.touches[0].clientY - this.dragStartY;
+                    const rect = canvas.getBoundingClientRect();
+                    const scale = GAME_CONFIG.height / rect.height;
+                    this.scrollY = this.dragStartScroll - dy * scale;
+                    this._clampScroll();
+                    // 속도 계산 (관성용)
+                    this.scrollVelocity = -(e.touches[0].clientY - this.lastDragY) * scale;
+                    this.lastDragY = e.touches[0].clientY;
+                    if (Math.abs(dy) > 8) this.dragMoved = true;
+                    e.preventDefault();
+                };
+                this._touchEndHandler = () => {
+                    this.isDragging = false;
+                };
+                canvas.addEventListener('touchstart', this._touchStartHandler, { passive: true });
+                canvas.addEventListener('touchmove', this._touchMoveHandler, { passive: false });
+                canvas.addEventListener('touchend', this._touchEndHandler, { passive: true });
+            }
+
+            _clampScroll() {
+                if (this.scrollY < 0) this.scrollY = 0;
+                if (this.scrollY > this.maxScroll) this.scrollY = this.maxScroll;
+            }
+
+            _calcMaxScroll() {
+                const keys = Object.keys(spriteConfig.sprites);
+                const rows = Math.ceil(keys.length / this.cols);
+                const totalH = rows * (this.cellH + 10);
+                this.maxScroll = Math.max(0, totalH - this.gridClipH);
             }
 
             update(deltaTime) {
                 this.charFrame += 0.05;
                 this.bg.update(deltaTime * 0.2);
                 if (this.messageTimer > 0) this.messageTimer -= deltaTime;
+                this._calcMaxScroll();
+                // 관성 스크롤
+                if (!this.isDragging && Math.abs(this.scrollVelocity) > 0.5) {
+                    this.scrollY += this.scrollVelocity * deltaTime * 60;
+                    this.scrollVelocity *= 0.92;
+                    this._clampScroll();
+                } else if (!this.isDragging) {
+                    this.scrollVelocity = 0;
+                }
             }
 
             draw(ctx) {
                 this.bg.draw(ctx);
+                const W = GAME_CONFIG.width;
+                const H = GAME_CONFIG.height;
 
                 // 메인 패널
                 ctx.fillStyle = 'rgba(255,255,255,0.92)';
                 ctx.beginPath();
-                ctx.roundRect(30, 20, GAME_CONFIG.width - 60, GAME_CONFIG.height - 40, 20);
+                ctx.roundRect(30, 15, W - 60, H - 30, 20);
                 ctx.fill();
                 ctx.strokeStyle = '#FF8800';
                 ctx.lineWidth = 3;
@@ -3147,129 +3235,173 @@
 
                 // 제목
                 ctx.fillStyle = '#FF8800';
-                ctx.font = 'bold 40px Arial';
-                ctx.fillText('캐릭터 선택', GAME_CONFIG.width/2, 60);
+                ctx.font = 'bold 36px Arial';
+                ctx.fillText('캐릭터 선택', W/2, 50);
 
                 // 보유 동전
                 ctx.fillStyle = '#FFD700';
-                ctx.font = 'bold 24px Arial';
-                ctx.fillText(`보유 동전: ${gameState.totalCoins}`, GAME_CONFIG.width/2, 100);
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText(`💰 보유 동전: ${gameState.totalCoins}`, W/2, 88);
 
-                // 캐릭터 그리드 (2줄 지원, 상단 4개 + 하단 나머지)
+                // ── 스크롤 가능한 캐릭터 그리드 영역 ──
                 const keys = Object.keys(spriteConfig.sprites);
-                const cols = 4;
-                const cellW = 130;
-                const cellH = 150;
+                const { cols, cellW, cellH, gridTop, gridClipH } = this;
+                const rows = Math.ceil(keys.length / cols);
                 const gridW = cols * cellW;
-                const gridStartX = GAME_CONFIG.width/2 - gridW / 2;
-                const startY = 120;
+                const gridStartX = W/2 - gridW / 2;
+
+                // 클리핑 영역 설정
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(35, gridTop, W - 70, gridClipH);
+                ctx.clip();
 
                 keys.forEach((key, i) => {
                     const char = spriteConfig.sprites[key];
                     const row = Math.floor(i / cols);
                     const col = i % cols;
-                    // 하단 줄은 중앙 정렬
-                    const rowCount = row === 0 ? Math.min(keys.length, cols) : keys.length - cols;
-                    const rowStartX = row === 0 ? gridStartX : GAME_CONFIG.width/2 - (rowCount * cellW) / 2;
+                    // 각 줄의 실제 아이템 수로 중앙 정렬
+                    const rowItems = Math.min(cols, keys.length - row * cols);
+                    const rowW = rowItems * cellW;
+                    const rowStartX = W/2 - rowW / 2;
                     const cx = rowStartX + col * cellW + cellW / 2;
-                    const cy = startY + row * (cellH + 10) + cellH / 2;
+                    const cardY = gridTop + row * (cellH + 10) - this.scrollY;
+
+                    // 화면 밖이면 스킵 (성능)
+                    if (cardY + cellH < gridTop - 10 || cardY > gridTop + gridClipH + 10) return;
+
                     const isSelected = gameState.selectedCharacter === key;
                     const isUnlocked = gameState.unlockedCharacters.includes(key);
 
-                    // 카드 Y 좌표 (행 기반)
-                    const cardY = startY + row * (cellH + 10);
-
-                    // 카드 배경
-                    ctx.fillStyle = isSelected ? '#E0F0FF' : '#F5F5F5';
+                    // 카드 배경 (좀 더 큰 카드)
+                    ctx.fillStyle = isSelected ? '#DDEEFF' : '#F5F5F5';
                     ctx.strokeStyle = isSelected ? '#0099FF' : '#DDD';
                     ctx.lineWidth = isSelected ? 3 : 1;
                     ctx.beginPath();
-                    ctx.roundRect(cx - 55, cardY, 110, cellH - 10, 10);
+                    ctx.roundRect(cx - cellW/2 + 8, cardY, cellW - 16, cellH - 10, 12);
                     ctx.fill();
                     ctx.stroke();
 
-                    // 캐릭터 그리기 (잠긴 것도 반투명으로 보여줌)
+                    // 선택 하이라이트 글로우
+                    if (isSelected) {
+                        ctx.shadowColor = '#0099FF';
+                        ctx.shadowBlur = 8;
+                        ctx.strokeStyle = '#0099FF';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.roundRect(cx - cellW/2 + 8, cardY, cellW - 16, cellH - 10, 12);
+                        ctx.stroke();
+                        ctx.shadowBlur = 0;
+                    }
+
+                    // 캐릭터 스프라이트 (큰 사이즈)
                     if (char.drawSprite) {
                         if (!isUnlocked) ctx.globalAlpha = 0.35;
                         try {
-                            char.drawSprite(ctx, cx - 32, cardY + 10, this.charFrame, false, false);
+                            char.drawSprite(ctx, cx - 32, cardY + 15, this.charFrame, false, false);
                         } catch(e) {
                             ctx.fillStyle = char.colors ? char.colors.main : '#CCC';
                             ctx.beginPath();
-                            ctx.arc(cx, cardY + 45, 22, 0, Math.PI * 2);
+                            ctx.arc(cx, cardY + 50, 24, 0, Math.PI * 2);
                             ctx.fill();
                         }
                         ctx.globalAlpha = 1;
                     }
+                    // 잠금 표시
                     if (!isUnlocked) {
                         ctx.fillStyle = 'rgba(0,0,0,0.3)';
                         ctx.beginPath();
-                        ctx.arc(cx, cardY + 42, 22, 0, Math.PI * 2);
+                        ctx.arc(cx, cardY + 47, 24, 0, Math.PI * 2);
                         ctx.fill();
                         ctx.fillStyle = '#FFF';
-                        ctx.font = 'bold 24px Arial';
-                        ctx.fillText('🔒', cx, cardY + 45);
+                        ctx.font = 'bold 28px Arial';
+                        ctx.fillText('🔒', cx, cardY + 50);
                     }
 
-                    // 이름
+                    // 캐릭터 이름
                     ctx.fillStyle = '#333';
-                    ctx.font = 'bold 14px Arial';
-                    ctx.fillText(char.name, cx, cardY + cellH - 40);
+                    ctx.font = 'bold 15px Arial';
+                    ctx.fillText(char.name, cx, cardY + cellH - 48);
+
+                    // 능력 이름 (작은 글씨)
+                    const ab = CHARACTER_ABILITIES[key];
+                    if (ab && ab.type !== 'none') {
+                        ctx.fillStyle = '#888';
+                        ctx.font = '11px Arial';
+                        ctx.fillText(ab.name, cx, cardY + cellH - 32);
+                    }
 
                     // 가격 또는 상태
                     if (isSelected && isUnlocked) {
                         ctx.fillStyle = '#0099FF';
-                        ctx.font = 'bold 13px Arial';
-                        ctx.fillText('✓ 선택됨', cx, cardY + cellH - 22);
+                        ctx.font = 'bold 14px Arial';
+                        ctx.fillText('✓ 선택됨', cx, cardY + cellH - 16);
                     } else if (isUnlocked) {
                         ctx.fillStyle = '#22BB22';
                         ctx.font = '13px Arial';
-                        ctx.fillText('보유중', cx, cardY + cellH - 22);
+                        ctx.fillText('보유중', cx, cardY + cellH - 16);
                     } else {
                         ctx.fillStyle = '#FF8800';
-                        ctx.font = 'bold 13px Arial';
-                        ctx.fillText(`${char.cost} 동전`, cx, cardY + cellH - 22);
+                        ctx.font = 'bold 14px Arial';
+                        ctx.fillText(`🪙 ${char.cost}`, cx, cardY + cellH - 16);
                     }
                 });
 
-                // 메시지 표시
-                if (this.messageTimer > 0 && this.message) {
-                    ctx.fillStyle = 'rgba(0,0,0,0.8)';
-                    ctx.beginPath();
-                    ctx.roundRect(GAME_CONFIG.width/2 - 180, GAME_CONFIG.height - 120, 360, 40, 10);
-                    ctx.fill();
-                    ctx.fillStyle = '#FFDD00';
-                    ctx.font = 'bold 18px Arial';
-                    ctx.fillText(this.message, GAME_CONFIG.width/2, GAME_CONFIG.height - 100);
+                ctx.restore(); // 클리핑 해제
+
+                // 스크롤바 (maxScroll > 0일 때만)
+                if (this.maxScroll > 0) {
+                    const sbX = W - 50;
+                    const sbH = gridClipH;
+                    const thumbH = Math.max(30, (gridClipH / (gridClipH + this.maxScroll)) * sbH);
+                    const thumbY = gridTop + (this.scrollY / this.maxScroll) * (sbH - thumbH);
+                    // 트랙
+                    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+                    ctx.beginPath(); ctx.roundRect(sbX, gridTop, 6, sbH, 3); ctx.fill();
+                    // 썸
+                    ctx.fillStyle = 'rgba(255,136,0,0.5)';
+                    ctx.beginPath(); ctx.roundRect(sbX, thumbY, 6, thumbH, 3); ctx.fill();
                 }
 
+                // ── 하단 고정 영역 ──
                 // 선택된 캐릭터 능력 표시
                 const selectedAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
                 if (selectedAbility && selectedAbility.type !== 'none') {
                     ctx.fillStyle = 'rgba(255,102,0,0.1)';
                     ctx.beginPath();
-                    ctx.roundRect(GAME_CONFIG.width/2 - 180, GAME_CONFIG.height - 115, 360, 35, 8);
+                    ctx.roundRect(W/2 - 200, H - 120, 400, 35, 8);
                     ctx.fill();
                     ctx.strokeStyle = '#FF8800';
                     ctx.lineWidth = 1;
                     ctx.stroke();
 
                     ctx.fillStyle = '#FF6600';
-                    ctx.font = 'bold 16px Arial';
+                    ctx.font = 'bold 15px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText(`⚡ ${selectedAbility.name}: ${selectedAbility.desc}`, GAME_CONFIG.width/2, GAME_CONFIG.height - 97);
-                    ctx.textAlign = 'left';
+                    ctx.fillText(`⚡ ${selectedAbility.name}: ${selectedAbility.desc}`, W/2, H - 102);
+                }
+
+                // 메시지 표시
+                if (this.messageTimer > 0 && this.message) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+                    ctx.beginPath();
+                    ctx.roundRect(W/2 - 180, H - 155, 360, 36, 10);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFDD00';
+                    ctx.font = 'bold 17px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.message, W/2, H - 137);
                 }
 
                 // 뒤로가기 버튼
                 ctx.fillStyle = '#666';
                 ctx.beginPath();
-                ctx.roundRect(GAME_CONFIG.width/2 - 80, GAME_CONFIG.height - 65, 160, 45, 10);
+                ctx.roundRect(W/2 - 80, H - 75, 160, 45, 10);
                 ctx.fill();
                 ctx.fillStyle = '#FFF';
                 ctx.font = 'bold 22px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText('← 돌아가기', GAME_CONFIG.width/2, GAME_CONFIG.height - 42);
+                ctx.fillText('← 돌아가기', W/2, H - 52);
                 ctx.textAlign = 'left';
 
                 ctx.restore();
@@ -3277,45 +3409,52 @@
 
             handleInput(inputState) {
                 if (!inputState.jumping) return;
+                // 드래그 중이면 탭으로 처리 안 함
+                if (this.dragMoved) { this.dragMoved = false; return; }
                 const mx = inputManager.lastTouchX;
                 const my = inputManager.lastTouchY;
                 if (mx === undefined || my === undefined) return;
+                const W = GAME_CONFIG.width;
+                const H = GAME_CONFIG.height;
 
                 // 돌아가기 버튼
-                if (mx >= GAME_CONFIG.width/2 - 80 && mx <= GAME_CONFIG.width/2 + 80 &&
-                    my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 20) {
+                if (mx >= W/2 - 80 && mx <= W/2 + 80 &&
+                    my >= H - 75 && my <= H - 30) {
                     gameState.currentScene = 'title';
                     localStorage.setItem('selectedCharacter', gameState.selectedCharacter);
                     return;
                 }
 
-                // 캐릭터 카드 클릭 판정 (2줄 그리드)
+                // 그리드 영역 밖 클릭 무시
+                if (my < this.gridTop || my > this.gridBottom) return;
+
+                // 캐릭터 카드 클릭 판정
                 const keys = Object.keys(spriteConfig.sprites);
-                const cols = 4;
-                const cellW = 130;
-                const cellH = 150;
+                const { cols, cellW, cellH, gridTop } = this;
                 const gridW = cols * cellW;
-                const gridStartX = GAME_CONFIG.width/2 - gridW / 2;
-                const startY = 120;
 
                 keys.forEach((key, i) => {
                     const char = spriteConfig.sprites[key];
                     const row = Math.floor(i / cols);
                     const col = i % cols;
-                    const rowCount = row === 0 ? Math.min(keys.length, cols) : keys.length - cols;
-                    const rowStartX = row === 0 ? gridStartX : GAME_CONFIG.width/2 - (rowCount * cellW) / 2;
+                    const rowItems = Math.min(cols, keys.length - row * cols);
+                    const rowW = rowItems * cellW;
+                    const rowStartX = W/2 - rowW / 2;
                     const cx = rowStartX + col * cellW + cellW / 2;
-                    const cardY = startY + row * (cellH + 10);
+                    const cardY = gridTop + row * (cellH + 10) - this.scrollY;
                     const isUnlocked = gameState.unlockedCharacters.includes(key);
 
-                    if (mx >= cx - 55 && mx <= cx + 55 && my >= cardY && my <= cardY + cellH - 10) {
+                    const cardLeft = cx - cellW/2 + 8;
+                    const cardRight = cx + cellW/2 - 8;
+                    const cardBottom = cardY + cellH - 10;
+
+                    if (mx >= cardLeft && mx <= cardRight && my >= cardY && my <= cardBottom) {
                         if (isUnlocked) {
                             gameState.selectedCharacter = key;
                             localStorage.setItem('selectedCharacter', key);
                             this.message = `${char.name} 선택 완료!`;
                             this.messageTimer = 1.5;
                         } else if (gameState.totalCoins >= char.cost) {
-                            // 구매!
                             gameState.totalCoins -= char.cost;
                             gameState.unlockedCharacters.push(key);
                             gameState.selectedCharacter = key;
@@ -4708,7 +4847,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.9.0';
+        const GAME_VERSION = 'v3.9.1';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
