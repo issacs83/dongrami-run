@@ -61,49 +61,64 @@
             -webkit-user-select: none;
         }
 
-        /* 모바일 세로 모드 → 자동 가로 회전 (CSS transform) */
-        #rotateOverlay { display: none; }
+        /* 모바일: 풀스크린 + 가로 잠금 방식 (CSS transform 제거) */
+        #rotateOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #FFF;
+            font-family: Arial, sans-serif;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #rotateOverlay .play-btn {
+            width: 80px; height: 80px;
+            background: #FF4444;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            box-shadow: 0 0 30px rgba(255,68,68,0.5);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        #rotateOverlay .text { font-size: 20px; margin-top: 18px; font-weight: bold; }
+        #rotateOverlay .sub { font-size: 13px; margin-top: 8px; color: #AAA; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
 
         @media screen and (max-width: 768px) and (orientation: portrait) {
-            html, body {
-                overflow: hidden;
-                margin: 0; padding: 0;
-                width: 100%; height: 100%;
-            }
-            #gameContainer {
-                position: fixed;
-                top: 0; left: 0;
-                /* 실제 뷰포트 크기 사용 (dvh = dynamic viewport height) */
-                width: 100dvh !important;
-                height: 100dvw !important;
-                /* fallback for older browsers */
-                width: calc(var(--vh, 1vh) * 100) !important;
-                height: calc(var(--vw, 1vw) * 100) !important;
-                transform: rotate(90deg);
-                transform-origin: top left;
-                margin-left: 100dvw;
-                display: flex !important;
-                justify-content: center;
-                align-items: center;
-                background: #000;
-            }
-            #gameCanvas {
-                max-width: 100% !important;
-                max-height: 100% !important;
-                object-fit: contain;
-            }
+            #rotateOverlay { display: flex !important; }
+            #gameContainer { display: none !important; }
         }
         @media screen and (max-width: 768px) and (orientation: landscape) {
+            #rotateOverlay { display: none !important; }
             #gameContainer { display: flex !important; }
+        }
+        /* 풀스크린 진입 후에는 오버레이 숨기기 */
+        :fullscreen #rotateOverlay,
+        :-webkit-full-screen #rotateOverlay {
+            display: none !important;
+        }
+        :fullscreen #gameContainer,
+        :-webkit-full-screen #gameContainer {
+            display: flex !important;
         }
     </style>
 </head>
 <body>
-    <!-- 모바일 세로 모드 → 가로 회전 안내 -->
+    <!-- 모바일 세로 모드 → 풀스크린 가로 전환 -->
     <div id="rotateOverlay">
-        <div class="icon">📱</div>
-        <div class="text">화면을 가로로 돌려주세요!</div>
-        <div class="sub">가로 모드에서 플레이할 수 있어요</div>
+        <div class="play-btn">▶</div>
+        <div class="text">터치하여 게임 시작!</div>
+        <div class="sub">자동으로 가로 화면으로 전환됩니다</div>
     </div>
 
     <div id="gameContainer">
@@ -1146,44 +1161,22 @@
                     }
                 });
 
-                // 모바일 세로모드 회전 시 터치 좌표 변환 헬퍼
+                // 터치/클릭 좌표 → 게임 좌표 변환 (CSS transform 없음, 단순 스케일)
                 const canvas = document.getElementById('gameCanvas');
 
                 this._clientToGame = (clientX, clientY) => {
-                    const isMobilePortrait = window.innerWidth <= 768 && window.innerWidth < window.innerHeight;
                     const rect = canvas.getBoundingClientRect();
-
-                    if (isMobilePortrait) {
-                        // CSS rotate(90deg) 적용 상태:
-                        // 화면의 clientX → 게임의 Y (위에서 아래)
-                        // 화면의 clientY → 게임의 X (오른쪽에서 왼쪽, 반전)
-                        // rect는 회전 후 bounding box이므로 직접 계산
-                        const canvasDisplayW = canvas.offsetWidth;  // 게임의 가로 (= 화면 세로)
-                        const canvasDisplayH = canvas.offsetHeight; // 게임의 세로 (= 화면 가로)
-                        // 회전된 캔버스에서의 상대 위치 계산
-                        // rotate(90deg) + transform-origin: top left + margin-left: 100dvw
-                        // → 캔버스의 왼쪽 상단이 화면의 오른쪽 상단에 위치
-                        // 게임 X = 화면 아래에서 위로 = screenHeight - clientY
-                        // 게임 Y = 화면 왼쪽에서 오른쪽 = clientX
-                        const gameRelX = (window.innerHeight - clientY) / window.innerHeight * canvasDisplayW;
-                        const gameRelY = clientX / window.innerWidth * canvasDisplayH;
-                        const scaleX = GAME_CONFIG.width / canvasDisplayW;
-                        const scaleY = GAME_CONFIG.height / canvasDisplayH;
-                        return { x: gameRelX * scaleX, y: gameRelY * scaleY };
-                    } else {
-                        const scaleX = GAME_CONFIG.width / rect.width;
-                        const scaleY = GAME_CONFIG.height / rect.height;
-                        return {
-                            x: (clientX - rect.left) * scaleX,
-                            y: (clientY - rect.top) * scaleY
-                        };
-                    }
+                    const scaleX = GAME_CONFIG.width / rect.width;
+                    const scaleY = GAME_CONFIG.height / rect.height;
+                    return {
+                        x: (clientX - rect.left) * scaleX,
+                        y: (clientY - rect.top) * scaleY
+                    };
                 };
 
                 // Touch jump
                 canvas.addEventListener('touchstart', (e) => {
                     this.touchStartY = e.touches[0].clientY;
-                    this.touchStartX = e.touches[0].clientX;
                     const pos = this._clientToGame(e.touches[0].clientX, e.touches[0].clientY);
                     this.lastTouchX = pos.x;
                     this.lastTouchY = pos.y;
@@ -1196,18 +1189,9 @@
 
                 canvas.addEventListener('touchmove', (e) => {
                     if (e.touches.length > 0) {
-                        const isMobilePortrait = window.innerWidth <= 768 && window.innerWidth < window.innerHeight;
-                        if (isMobilePortrait) {
-                            // 세로모드 회전: 화면의 X이동 = 게임의 아래로 스와이프
-                            const deltaX = e.touches[0].clientX - this.touchStartX;
-                            if (deltaX > 50) {
-                                this.ducking = true;
-                            }
-                        } else {
-                            const deltaY = e.touches[0].clientY - this.touchStartY;
-                            if (deltaY > 50) {
-                                this.ducking = true;
-                            }
+                        const deltaY = e.touches[0].clientY - this.touchStartY;
+                        if (deltaY > 50) {
+                            this.ducking = true;
                         }
                     }
                 }, { passive: true });
@@ -3779,26 +3763,11 @@
         canvas.width = GAME_CONFIG.width;
         canvas.height = GAME_CONFIG.height;
 
-        // 캔버스를 화면에 맞게 리사이즈 (세로 모드 자동 가로 회전 지원)
-        function updateVhVw() {
-            // 실제 뷰포트 크기를 CSS 변수로 설정 (주소표시줄 등 고려)
-            document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
-            document.documentElement.style.setProperty('--vw', window.innerWidth * 0.01 + 'px');
-        }
-
+        // 캔버스를 화면에 맞게 리사이즈 (단순 스케일 — CSS transform 없음)
         function resizeCanvas() {
-            updateVhVw();
             const container = document.getElementById('gameContainer');
-            const isMobilePortrait = window.innerWidth <= 768 && window.innerWidth < window.innerHeight;
-            let containerW, containerH;
-            if (isMobilePortrait) {
-                // 세로 모드: CSS가 90도 회전 → 가용 가로=innerHeight, 세로=innerWidth
-                containerW = window.innerHeight;
-                containerH = window.innerWidth;
-            } else {
-                containerW = container.clientWidth;
-                containerH = container.clientHeight;
-            }
+            const containerW = container.clientWidth || window.innerWidth;
+            const containerH = container.clientHeight || window.innerHeight;
             const scale = Math.min(containerW / GAME_CONFIG.width, containerH / GAME_CONFIG.height);
             canvas.style.width = (GAME_CONFIG.width * scale) + 'px';
             canvas.style.height = (GAME_CONFIG.height * scale) + 'px';
@@ -3807,12 +3776,37 @@
         window.addEventListener('orientationchange', () => { setTimeout(resizeCanvas, 100); setTimeout(resizeCanvas, 300); });
         resizeCanvas();
 
-        // 가능하면 화면 방향을 가로로 잠금 (지원하는 브라우저)
-        try {
-            if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('landscape').catch(() => {});
+        // 모바일 세로모드: 풀스크린 + 가로 잠금으로 자동 전환
+        function enterFullscreenLandscape() {
+            const docEl = document.documentElement;
+            const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+            if (requestFS) {
+                requestFS.call(docEl).then(() => {
+                    // 풀스크린 진입 성공 → 가로 잠금
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').catch(() => {});
+                    }
+                    setTimeout(resizeCanvas, 300);
+                }).catch(() => {
+                    // 풀스크린 실패 시에도 가로 잠금 시도
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').catch(() => {});
+                    }
+                });
             }
-        } catch(e) {}
+        }
+
+        // rotateOverlay 터치 시 풀스크린 진입
+        const rotateOverlay = document.getElementById('rotateOverlay');
+        rotateOverlay.addEventListener('click', enterFullscreenLandscape);
+        rotateOverlay.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            enterFullscreenLandscape();
+        }, { passive: false });
+
+        // 풀스크린 상태 변경 시 리사이즈
+        document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 300));
+        document.addEventListener('webkitfullscreenchange', () => setTimeout(resizeCanvas, 300));
 
         // 첫 실행 시 보너스 코인 300개 지급
         if (!localStorage.getItem('dongramiRunInitialized')) {
