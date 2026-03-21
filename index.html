@@ -663,7 +663,7 @@
                 this.beatIndex = 0;
                 this.bpm = 120;
                 this.isPlaying = false;
-                this.targetVolume = 0.10; // BGM 볼륨 (효과음보다 낮게)
+                this.targetVolume = 0.35; // BGM 볼륨
                 this.seasonTransitionOverlay = null; // { season, timer, maxTime }
 
                 // 계절별 음악 패턴 정의
@@ -676,8 +676,8 @@
                         bass: [0,0,3,3, 5,5,4,4],
                         waveType: 'triangle',
                         bassType: 'sine',
-                        melodyVol: 0.09,
-                        bassVol: 0.05,
+                        melodyVol: 0.28,
+                        bassVol: 0.18,
                         arpeggio: true
                     },
                     summer: {
@@ -688,8 +688,8 @@
                         bass: [0,0,4,4, 5,5,2,2],
                         waveType: 'square',
                         bassType: 'triangle',
-                        melodyVol: 0.06,
-                        bassVol: 0.04,
+                        melodyVol: 0.18,
+                        bassVol: 0.12,
                         arpeggio: false
                     },
                     autumn: {
@@ -700,8 +700,8 @@
                         bass: [0,0,3,3, 5,5,4,4],
                         waveType: 'triangle',
                         bassType: 'sine',
-                        melodyVol: 0.08,
-                        bassVol: 0.05,
+                        melodyVol: 0.25,
+                        bassVol: 0.16,
                         arpeggio: false
                     },
                     winter: {
@@ -712,8 +712,8 @@
                         bass: [0,0,2,2, 4,4,3,3],
                         waveType: 'sine',
                         bassType: 'sine',
-                        melodyVol: 0.08,
-                        bassVol: 0.06,
+                        melodyVol: 0.25,
+                        bassVol: 0.20,
                         arpeggio: true
                     }
                 };
@@ -2184,7 +2184,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v2.0.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v2.1.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -2472,12 +2472,30 @@
                 this.player.update(inputState, deltaTime);
                 this.particles.update(deltaTime);
 
-                // Update speed & level (0~100) + 계절 레벨 보너스 적용
-                // seasonLevel은 0~100 범위, 속도 보너스는 미미하게 (순환할수록 살짝 빨라짐)
-                const seasonSpeedBonus = gameState.seasonLevel * 0.3;
+                // ═══════════════════════════════════════════════════════════
+                // 속도 시스템 (v2.1 리팩터링)
+                // ─────────────────────────────────────────────────────────
+                // 속도 = 기본속도 + (점수 기반 미세 증가) + (겨울 통과 보너스)
+                //
+                // 1) 점수 기반: score * 0.005 → 200점(1순환)에 +1.0 속도
+                //    자연스럽고 일정한 증가. 급변 없음.
+                // 2) 겨울 통과 보너스: winterCount * 0.5 (겨울→봄 전환 시 +0.5)
+                //    순환할수록 확실히 빨라지는 체감.
+                // 3) 최대속도 12 제한
+                //
+                // 예시 진행:
+                //   0점(시작):     4.5
+                //   200점(1순환):  4.5 + 1.0 + 0.5 = 6.0
+                //   400점(2순환):  4.5 + 2.0 + 1.0 = 7.5
+                //   600점(3순환):  4.5 + 3.0 + 1.5 = 9.0
+                //   800점(4순환):  4.5 + 4.0 + 2.0 = 10.5
+                //   1000점(5순환): 4.5 + 5.0 + 2.5 = 12.0 (최대)
+                // ═══════════════════════════════════════════════════════════
+                const scoreSpeed = gameState.score * 0.005;
+                const winterBonus = gameState.winterCount * 0.5;
                 gameState.gameSpeed = Math.min(
                     GAME_CONFIG.maxSpeed,
-                    GAME_CONFIG.initialSpeed + gameState.score * GAME_CONFIG.speedIncrease + seasonSpeedBonus
+                    GAME_CONFIG.initialSpeed + scoreSpeed + winterBonus
                 );
                 gameState.speedLevel = Math.min(100, Math.floor(
                     ((gameState.gameSpeed - GAME_CONFIG.initialSpeed) / (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed)) * 100
@@ -2658,11 +2676,11 @@
                 ctx.fillStyle = gameState.speedLevel >= 80 ? '#FF2200' : gameState.speedLevel >= 50 ? '#FF8800' : '#0066CC';
                 ctx.fillText(`⚡ LV.${gameState.speedLevel}`, 230, 22);
 
-                // 계절 레벨 표시 (겨울 통과 보너스)
-                if (gameState.seasonLevel > 0) {
+                // 겨울 통과 횟수 표시 (속도 보너스 표시)
+                if (gameState.winterCount > 0) {
                     ctx.font = 'bold 18px Arial';
-                    ctx.fillStyle = '#8B4513';
-                    ctx.fillText(`🌍 계절 +${gameState.seasonLevel.toFixed(1)}`, 370, 24);
+                    ctx.fillStyle = '#4488CC';
+                    ctx.fillText(`❄️ x${gameState.winterCount}`, 370, 24);
                 }
 
                 ctx.fillStyle = '#000000';
