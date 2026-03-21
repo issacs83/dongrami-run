@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.9.4';
+        var CURRENT_VER = 'v3.9.5';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1854,56 +1854,65 @@
                 this.frameIndex += 0.1;
                 this.moveTimer += deltaTime || 0.016;
 
+                // ??? 난이도 속도 배수 (겨울 25회 이상 = diffStage 5+)
+                const wc = gameState.winterCount || 0;
+                const diffStage = Math.floor(wc / 5);
+                const hellBoost = diffStage >= 5 ? 1.3 + (diffStage - 5) * 0.1 : 1; // 1.3x~
+                const sp = gameSpeed * hellBoost;
+
                 switch(this.type) {
                     case 'villain-slime':
                         // 삐뚤이: 통통 튀면서 이동
-                        this.x -= gameSpeed;
-                        this.y = this.baseY - Math.abs(Math.sin(this.moveTimer * 5)) * 30;
+                        this.x -= sp;
+                        const bounceH = diffStage >= 5 ? 50 : 30; // ???에서 더 높이 튐
+                        this.y = this.baseY - Math.abs(Math.sin(this.moveTimer * 5)) * bounceH;
                         break;
 
                     case 'villain-cat':
-                        // 까미: 1.5배 빠른 돌진
-                        this.x -= gameSpeed * 1.5;
+                        // 까미: 1.5배 빠른 돌진 (???에서 2배)
+                        this.x -= sp * (diffStage >= 5 ? 2.0 : 1.5);
                         break;
 
                     case 'villain-flame':
-                        // 불꽃이: 사인파 비행 (위아래 물결)
-                        this.x -= gameSpeed;
-                        this.y = this.baseY + Math.sin(this.moveTimer * 3) * 40;
+                        // 불꽃이: 사인파 비행 (???에서 진폭 넓고 빠르게)
+                        this.x -= sp;
+                        const flameAmp = diffStage >= 5 ? 70 : 40;
+                        const flameSpd = diffStage >= 5 ? 5 : 3;
+                        this.y = this.baseY + Math.sin(this.moveTimer * flameSpd) * flameAmp;
                         break;
 
                     case 'villain-spike':
-                        // 가시왕: 잠시 멈췄다가 빠르게 돌진
+                        // 가시왕: 잠시 멈췄다가 빠르게 돌진 (???에서 더 빠르게)
                         if (this.movePhase === 0) {
-                            // 느리게 접근
-                            this.x -= gameSpeed * 0.4;
-                            if (this.x < GAME_CONFIG.width * 0.7) {
+                            this.x -= sp * 0.4;
+                            if (this.x < GAME_CONFIG.width * (diffStage >= 5 ? 0.85 : 0.7)) {
                                 this.movePhase = 1;
-                                this.dashSpeed = gameSpeed * 2.5;
+                                this.dashSpeed = sp * (diffStage >= 5 ? 3.5 : 2.5);
                             }
                         } else {
-                            // 빠르게 돌진!
                             this.x -= this.dashSpeed;
                         }
                         break;
 
                     case 'villain-ghost':
-                        // 유령이: 위아래 떠다님 + 투명↔불투명 (draw에서 처리)
-                        this.x -= gameSpeed * 0.8;
-                        this.y = this.baseY + Math.sin(this.moveTimer * 2) * 35;
+                        // 유령이: ???에서 더 빠르고 넓게 이동
+                        this.x -= sp * (diffStage >= 5 ? 1.2 : 0.8);
+                        const ghostAmp = diffStage >= 5 ? 55 : 35;
+                        this.y = this.baseY + Math.sin(this.moveTimer * 2) * ghostAmp;
                         break;
 
                     case 'villain-dark':
-                        // 다크동: 플레이어를 향해 Y축 추적
-                        this.x -= gameSpeed * 1.1;
+                        // 다크동: ???에서 추적력 강화 + 더 빠르게
+                        this.x -= sp * (diffStage >= 5 ? 1.5 : 1.1);
                         if (playerY !== undefined) {
-                            this.y += (playerY - this.y) * 0.03;
+                            const trackSpeed = diffStage >= 5 ? 0.08 : 0.03; // ???에서 추적 2.5배
+                            this.y += (playerY - this.y) * trackSpeed;
                         }
                         break;
 
                     default:
-                        // 일반 장애물: 기본 이동
-                        this.x -= gameSpeed;
+                        // 일반 장애물: ??? 난이도에서도 빠르게
+                        this.x -= sp;
                         break;
                 }
             }
@@ -3092,7 +3101,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.9.4', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.9.5', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3802,15 +3811,29 @@
                 this.obstacleTimer -= deltaTime;
                 if (this.obstacleTimer <= 0) {
                     this.spawnObstacle();
-                    // 기본 2.5~5.0초 → winterCount마다 점점 빨라짐 (최소 0.8~1.6초)
                     const wc = gameState.winterCount || 0;
-                    const spawnReduction = Math.min(1.7, wc * 0.08); // 최대 1.7초 감소
-                    const baseMin = Math.max(0.8, 2.5 - spawnReduction);
-                    const baseRange = Math.max(0.8, 2.5 - spawnReduction * 0.7);
-                    this.obstacleTimer = baseMin + Math.random() * baseRange;
-                    // 높은 순환: 가끔 연속 2개 장애물 동시 스폰
-                    if (wc >= 10 && Math.random() < Math.min(0.3, wc * 0.02)) {
-                        setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
+                    const diffStage = Math.floor(wc / 5);
+
+                    if (diffStage >= 5) {
+                        // ??? 난이도: 미친 스폰 속도 (0.3~0.7초)
+                        this.obstacleTimer = 0.3 + Math.random() * 0.4;
+                        // 50% 확률로 연속 2~3개 동시 스폰
+                        if (Math.random() < 0.5) {
+                            const extra = Math.random() < 0.4 ? 2 : 1;
+                            for (let e = 0; e < extra; e++) {
+                                setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 150 * (e + 1));
+                            }
+                        }
+                    } else {
+                        // 기본 2.5~5.0초 → winterCount마다 점점 빨라짐 (최소 0.8~1.6초)
+                        const spawnReduction = Math.min(1.7, wc * 0.08);
+                        const baseMin = Math.max(0.8, 2.5 - spawnReduction);
+                        const baseRange = Math.max(0.8, 2.5 - spawnReduction * 0.7);
+                        this.obstacleTimer = baseMin + Math.random() * baseRange;
+                        // 높은 순환: 가끔 연속 2개 장애물 동시 스폰
+                        if (wc >= 10 && Math.random() < Math.min(0.3, wc * 0.02)) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
+                        }
                     }
                 }
 
@@ -4057,11 +4080,35 @@
 
             draw(ctx) {
                 this.background.draw(ctx);
+
+                // ??? 난이도 시각 효과
+                const hellDiffStage = Math.floor((gameState.winterCount || 0) / 5);
+                if (hellDiffStage >= 5) {
+                    ctx.save();
+                    // 화면 미세 흔들림 (긴장감)
+                    const shakeX = (Math.random() - 0.5) * 3;
+                    const shakeY = (Math.random() - 0.5) * 2;
+                    ctx.translate(shakeX, shakeY);
+                    // 붉은 테두리 비네팅 효과
+                    const vigAlpha = 0.08 + Math.sin(Date.now() * 0.003) * 0.04;
+                    const vigGrad = ctx.createRadialGradient(
+                        GAME_CONFIG.width/2, GAME_CONFIG.height/2, GAME_CONFIG.height * 0.3,
+                        GAME_CONFIG.width/2, GAME_CONFIG.height/2, GAME_CONFIG.width * 0.7
+                    );
+                    vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+                    vigGrad.addColorStop(1, `rgba(180,0,0,${vigAlpha})`);
+                    ctx.fillStyle = vigGrad;
+                    ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+                }
+
                 this.particles.draw(ctx);
                 this.player.draw(ctx);
                 this.obstacles.forEach(o => o.draw(ctx));
                 this.coins.forEach(c => c.draw(ctx));
                 this.powerUps.forEach(p => p.draw(ctx));
+
+                // ??? 화면 효과 복원
+                if (hellDiffStage >= 5) ctx.restore();
 
                 // HUD
                 ctx.fillStyle = '#000000';
@@ -4087,9 +4134,17 @@
                         const diffColors = ['#FF8800', '#FF4400', '#FF0000', '#CC00FF', '#880088'];
                         const diffNames = ['어려움', '매우어려움', '극한', '지옥', '???'];
                         const idx = Math.min(diffStage - 1, diffColors.length - 1);
-                        ctx.fillStyle = diffColors[idx];
-                        ctx.font = 'bold 13px Arial';
-                        ctx.fillText(`🔥${diffNames[idx]}`, 440, 26);
+                        if (diffStage >= 5) {
+                            // ??? 깜빡이는 빨간 텍스트
+                            const blink = Math.sin(Date.now() * 0.01) > 0;
+                            ctx.fillStyle = blink ? '#FF0000' : '#880088';
+                            ctx.font = 'bold 15px Arial';
+                            ctx.fillText('💀 ???', 440, 26);
+                        } else {
+                            ctx.fillStyle = diffColors[idx];
+                            ctx.font = 'bold 13px Arial';
+                            ctx.fillText(`🔥${diffNames[idx]}`, 440, 26);
+                        }
                     }
                 }
 
@@ -5091,7 +5146,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.9.4';
+        const GAME_VERSION = 'v3.9.5';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
