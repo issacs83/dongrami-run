@@ -1,0 +1,2641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="동그라미 런">
+    <meta name="theme-color" content="#87ceeb">
+    <meta name="description" content="동그라미 런! 귀여운 캐릭터로 달리고, 점프하고, 장애물을 피하세요! 봄여름가을겨울 계절이 바뀌는 무한 러너 게임">
+    <!-- Open Graph (카카오톡, SNS 공유 미리보기) -->
+    <meta property="og:title" content="동그라미 런 🏃‍♂️">
+    <meta property="og:description" content="귀여운 캐릭터로 달리는 무한 러너 게임! 친구랑 점수 대결하자!">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><circle cx='100' cy='100' r='80' fill='%23FF4444'/><circle cx='80' cy='85' r='12' fill='white'/><circle cx='120' cy='85' r='12' fill='white'/><circle cx='83' cy='85' r='6' fill='black'/><circle cx='123' cy='85' r='6' fill='black'/><path d='M 80 115 Q 100 135 120 115' stroke='black' stroke-width='4' fill='none'/></svg>">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="동그라미 런 🏃‍♂️">
+    <meta name="twitter:description" content="귀여운 캐릭터로 달리는 무한 러너 게임! 친구랑 점수 대결하자!">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23FF4444'/><circle cx='40' cy='42' r='6' fill='white'/><circle cx='60' cy='42' r='6' fill='white'/><circle cx='42' cy='42' r='3' fill='black'/><circle cx='62' cy='42' r='3' fill='black'/><path d='M 40 58 Q 50 68 60 58' stroke='black' stroke-width='2' fill='none'/></svg>">
+    <title>동그라미 런 - Dongrami Run</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+            position: fixed;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #87ceeb;
+            touch-action: none;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        body {
+            touch-action: none;
+            -webkit-user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        // roundRect 폴리필 (구형 브라우저 호환)
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (typeof r === 'number') r = [r, r, r, r];
+                if (Array.isArray(r) && r.length === 1) r = [r[0], r[0], r[0], r[0]];
+                const [tl, tr, br, bl] = r;
+                this.moveTo(x + tl, y);
+                this.lineTo(x + w - tr, y);
+                this.arcTo(x + w, y, x + w, y + tr, tr);
+                this.lineTo(x + w, y + h - br);
+                this.arcTo(x + w, y + h, x + w - br, y + h, br);
+                this.lineTo(x + bl, y + h);
+                this.arcTo(x, y + h, x, y + h - bl, bl);
+                this.lineTo(x, y + tl);
+                this.arcTo(x, y, x + tl, y, tl);
+                this.closePath();
+                return this;
+            };
+        }
+
+        /*
+        ═══════════════════════════════════════════════════════════════════════════════
+        동그라미 런 (Dongrami Run) - Enhanced Runner Game
+
+        캐릭터 스프라이트 교체 가이드:
+        ─────────────────────────────────────────────────────────────────────────────
+        각 캐릭터는 canvas에 그려집니다. PNG 스프라이트로 교체하려면:
+
+        spriteConfig.sprites['캐릭터명'].spriteSheet = 'path/to/sprite.png'
+        frameWidth: 64, frameHeight: 64 (새로운 크기)
+        frameCount: 4 (달리기 프레임 수)
+
+        ═══════════════════════════════════════════════════════════════════════════════
+        */
+
+        // ============================================================================
+        // GAME CONFIGURATION
+        // ============================================================================
+        const GAME_CONFIG = {
+            width: 1024,
+            height: 576,
+            groundY: 576 * 0.82,  // 82% down the screen
+            playerStartX: 80,
+            playerSize: 64,
+            initialSpeed: 3,
+            maxSpeed: 7,
+            speedIncrease: 0.000012,
+            gravity: 0.42,
+            jumpPower: -14.5,
+            obstacleMinGap: 450,
+        };
+
+        // ============================================================================
+        // SPRITE CONFIGURATION - All drawn with canvas
+        // ============================================================================
+        const spriteConfig = {
+            sprites: {
+                동그라미: {
+                    name: '동그라미',
+                    colors: { main: '#FF4444', secondary: '#FFFFFF' },
+                    size: 64,
+                    drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                        ctx.save();
+                        ctx.translate(x + 32, y + 32);
+
+                        // Body - big red circle
+                        ctx.fillStyle = '#FF4444';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 28, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Dark outline
+                        ctx.strokeStyle = '#CC0000';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        // White eyes
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath();
+                        ctx.arc(-10, -8, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(10, -8, 6, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Black pupils - 오른쪽(앞)을 바라봄
+                        ctx.fillStyle = '#000000';
+                        let pupilX = 2;
+                        ctx.beginPath();
+                        ctx.arc(-10 + pupilX, -8, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(10 + pupilX, -8, 3, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Rosy cheeks
+                        ctx.fillStyle = 'rgba(255, 180, 180, 0.6)';
+                        ctx.beginPath();
+                        ctx.arc(-18, 5, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(18, 5, 5, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Happy smile
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(0, 8, 8, 0, Math.PI, false);
+                        ctx.stroke();
+
+                        // Legs
+                        if (!isDucking) {
+                            let legOffset = Math.sin(frameIndex * 0.3) * 3;
+                            ctx.fillStyle = '#FF6666';
+                            // Left leg
+                            ctx.fillRect(-8, 24 + legOffset, 4, 10);
+                            // Right leg
+                            ctx.fillRect(4, 24 - legOffset, 4, 10);
+                        }
+
+                        ctx.restore();
+                    },
+                    cost: 0,
+                    hitbox: { offsetX: 10, offsetY: 10, width: 44, height: 44 }
+                },
+
+                네모미: {
+                    name: '네모미',
+                    colors: { main: '#4AACBB', secondary: '#FFFFFF' },
+                    size: 64,
+                    drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                        ctx.save();
+                        ctx.translate(x + 32, y + 32);
+
+                        // Body - teal square with rounded corners
+                        ctx.fillStyle = '#4AACBB';
+                        ctx.beginPath();
+                        ctx.roundRect(-24, -24, 48, 48, 6);
+                        ctx.fill();
+
+                        // Dark outline
+                        ctx.strokeStyle = '#1A7A8A';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        // Eyes
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath();
+                        ctx.arc(-10, -8, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(10, -8, 6, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Pupils
+                        ctx.fillStyle = '#000000';
+                        ctx.beginPath();
+                        ctx.arc(-10, -8, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(10, -8, 3, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Mouth
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.rect(-6, 6, 12, 6);
+                        ctx.stroke();
+
+                        // Small feet
+                        if (!isDucking) {
+                            ctx.fillStyle = '#1A7A8A';
+                            ctx.fillRect(-10, 22, 5, 8);
+                            ctx.fillRect(5, 22, 5, 8);
+                        }
+
+                        ctx.restore();
+                    },
+                    cost: 300,
+                    hitbox: { offsetX: 10, offsetY: 10, width: 44, height: 44 }
+                },
+
+                별미: {
+                    name: '별미',
+                    colors: { main: '#FFD700', secondary: '#FFA500' },
+                    size: 64,
+                    drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                        ctx.save();
+                        ctx.translate(x + 32, y + 32);
+                        ctx.rotate(Math.sin(frameIndex * 0.1) * 0.1);
+
+                        // Draw star
+                        ctx.fillStyle = '#FFD700';
+                        ctx.beginPath();
+                        for (let i = 0; i < 5; i++) {
+                            let angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+                            let px = Math.cos(angle) * 24;
+                            let py = Math.sin(angle) * 24;
+                            if (i === 0) ctx.moveTo(px, py);
+                            else ctx.lineTo(px, py);
+
+                            angle = ((i + 0.5) * 4 * Math.PI) / 5 - Math.PI / 2;
+                            px = Math.cos(angle) * 12;
+                            py = Math.sin(angle) * 12;
+                            ctx.lineTo(px, py);
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // Dark outline
+                        ctx.strokeStyle = '#FFA500';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        // Eyes
+                        ctx.fillStyle = '#000000';
+                        ctx.beginPath();
+                        ctx.arc(-8, -5, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(8, -5, 4, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Smile
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(0, 6, 6, 0, Math.PI, false);
+                        ctx.stroke();
+
+                        ctx.restore();
+                    },
+                    cost: 300,
+                    hitbox: { offsetX: 10, offsetY: 10, width: 44, height: 44 }
+                },
+
+                삼각미: {
+                    name: '삼각미',
+                    colors: { main: '#22BB22', secondary: '#11AA11' },
+                    size: 64,
+                    drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                        ctx.save();
+                        ctx.translate(x + 32, y + 32);
+
+                        // Draw triangle
+                        ctx.fillStyle = '#22BB22';
+                        ctx.beginPath();
+                        ctx.moveTo(0, -28);
+                        ctx.lineTo(26, 20);
+                        ctx.lineTo(-26, 20);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // Dark outline
+                        ctx.strokeStyle = '#11AA11';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        // Eyes
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath();
+                        ctx.arc(-8, -5, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(8, -5, 5, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Pupils
+                        ctx.fillStyle = '#000000';
+                        ctx.beginPath();
+                        ctx.arc(-8, -5, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(8, -5, 3, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Mouth
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(0, 8, 6, 0, Math.PI, false);
+                        ctx.stroke();
+
+                        ctx.restore();
+                    },
+                    cost: 300,
+                    hitbox: { offsetX: 10, offsetY: 10, width: 44, height: 44 }
+                },
+
+                하트미: {
+                    name: '하트미',
+                    colors: { main: '#FF69B4', secondary: '#FF1493' },
+                    size: 64,
+                    drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                        ctx.save();
+                        ctx.translate(x + 32, y + 32);
+                        let pulse = 1 + Math.sin(frameIndex * 0.2) * 0.15;
+                        ctx.scale(pulse, pulse);
+
+                        // Draw heart shape
+                        ctx.fillStyle = '#FF69B4';
+                        ctx.beginPath();
+                        ctx.moveTo(0, -6);
+                        ctx.bezierCurveTo(-24, -30, -28, -22, -28, -8);
+                        ctx.bezierCurveTo(-28, 4, -14, 18, 0, 28);
+                        ctx.bezierCurveTo(14, 18, 28, 4, 28, -8);
+                        ctx.bezierCurveTo(28, -22, 24, -30, 0, -6);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // Dark outline
+                        ctx.strokeStyle = '#FF1493';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        // Eyes
+                        ctx.fillStyle = '#000000';
+                        ctx.beginPath();
+                        ctx.arc(-8, -8, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(8, -8, 4, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Smile
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(0, 4, 6, 0, Math.PI, false);
+                        ctx.stroke();
+
+                        ctx.restore();
+                    },
+                    cost: 500,
+                    hitbox: { offsetX: 10, offsetY: 10, width: 44, height: 44 }
+                }
+            }
+        };
+
+        // ============================================================================
+        // GAME STATE
+        // ============================================================================
+        const gameState = {
+            score: 0,
+            coins: 0,
+            coinsEarned: 0,
+            lives: 3,          // 하트 3개
+            maxLives: 3,
+            invulnTimer: 0,    // 피격 후 무적 시간
+            bestScore: parseInt(localStorage.getItem('bestScore')) || 0,
+            bestCoins: parseInt(localStorage.getItem('bestCoins')) || 0,
+            totalCoins: parseInt(localStorage.getItem('totalCoins')) || 300,
+            gameSpeed: GAME_CONFIG.initialSpeed,
+            isRunning: false,
+            isPaused: false,
+            currentScene: 'title',
+            selectedCharacter: (() => {
+                const saved = localStorage.getItem('selectedCharacter');
+                // 이전 버전 호환: 저장된 캐릭터가 현재 스프라이트에 없으면 기본값 사용
+                return (saved && spriteConfig.sprites[saved]) ? saved : Object.keys(spriteConfig.sprites)[0];
+            })(),
+            unlockedCharacters: (() => {
+                const saved = JSON.parse(localStorage.getItem('unlockedCharacters') || 'null');
+                const firstKey = Object.keys(spriteConfig.sprites)[0];
+                return (saved && Array.isArray(saved)) ? saved : [firstKey];
+            })(),
+            gameStartTime: 0,
+            gameTime: 0,
+        };
+
+        // ============================================================================
+        // AUDIO MANAGER
+        // ============================================================================
+        class AudioManager {
+            constructor() {
+                this.audioContext = null;
+                this.masterGain = null;
+                this.initAudio();
+            }
+
+            initAudio() {
+                if (!window.AudioContext && !window.webkitAudioContext) return;
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.audioContext = new AudioContext();
+                this.masterGain = this.audioContext.createGain();
+                this.masterGain.gain.value = 0.3;
+                this.masterGain.connect(this.audioContext.destination);
+            }
+
+            playJumpSound() {
+                if (!this.audioContext) return;
+                const now = this.audioContext.currentTime;
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(1000, now + 0.1);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            playCoinSound() {
+                if (!this.audioContext) return;
+                const now = this.audioContext.currentTime;
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playGameOverSound() {
+                if (!this.audioContext) return;
+                const now = this.audioContext.currentTime;
+                const notes = [400, 300, 200];
+                notes.forEach((freq, i) => {
+                    const osc = this.audioContext.createOscillator();
+                    const gain = this.audioContext.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.2, now + i * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.15);
+
+                    osc.connect(gain);
+                    gain.connect(this.masterGain);
+                    osc.start(now + i * 0.1);
+                    osc.stop(now + i * 0.1 + 0.15);
+                });
+            }
+
+            playPowerUpSound() {
+                if (!this.audioContext) return;
+                const now = this.audioContext.currentTime;
+                const notes = [800, 1000, 1200];
+                notes.forEach((freq, i) => {
+                    const osc = this.audioContext.createOscillator();
+                    const gain = this.audioContext.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.15, now + i * 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.1);
+
+                    osc.connect(gain);
+                    gain.connect(this.masterGain);
+                    osc.start(now + i * 0.05);
+                    osc.stop(now + i * 0.05 + 0.1);
+                });
+            }
+        }
+
+        // ============================================================================
+        // INPUT MANAGER - FIXED TOUCH HANDLING
+        // ============================================================================
+        class InputManager {
+            constructor() {
+                this.keys = {};
+                this.jumping = false;
+                this.ducking = false;
+                this.jumpPressed = false;
+                this.touchStartY = 0;
+                this.lastTouchX = undefined;
+                this.lastTouchY = undefined;
+                this.setupListeners();
+            }
+
+            setupListeners() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key] = true;
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        if (!this.jumpPressed) {
+                            this.jumping = true;
+                            this.jumpPressed = true;
+                        }
+                    }
+                    if (e.key === 'ArrowDown') {
+                        this.ducking = true;
+                    }
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key] = false;
+                    if (e.key === ' ') {
+                        this.jumpPressed = false;
+                    }
+                    if (e.key === 'ArrowDown') {
+                        this.ducking = false;
+                    }
+                });
+
+                // Touch jump
+                const canvas = document.getElementById('gameCanvas');
+                canvas.addEventListener('touchstart', (e) => {
+                    this.touchStartY = e.touches[0].clientY;
+                    // 캔버스 좌표 변환
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = GAME_CONFIG.width / rect.width;
+                    const scaleY = GAME_CONFIG.height / rect.height;
+                    this.lastTouchX = (e.touches[0].clientX - rect.left) * scaleX;
+                    this.lastTouchY = (e.touches[0].clientY - rect.top) * scaleY;
+                    if (!this.jumpPressed) {
+                        this.jumping = true;
+                        this.jumpPressed = true;
+                    }
+                    e.preventDefault();
+                });
+
+                canvas.addEventListener('touchmove', (e) => {
+                    if (e.touches.length > 0) {
+                        const deltaY = e.touches[0].clientY - this.touchStartY;
+                        if (deltaY > 50) {
+                            this.ducking = true;
+                        }
+                    }
+                });
+
+                canvas.addEventListener('touchend', (e) => {
+                    this.jumpPressed = false;
+                    this.ducking = false;
+                    e.preventDefault();
+                });
+
+                // Mouse click for jump
+                canvas.addEventListener('click', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = GAME_CONFIG.width / rect.width;
+                    const scaleY = GAME_CONFIG.height / rect.height;
+                    this.lastTouchX = (e.clientX - rect.left) * scaleX;
+                    this.lastTouchY = (e.clientY - rect.top) * scaleY;
+                    if (!this.jumpPressed) {
+                        this.jumping = true;
+                        this.jumpPressed = true;
+                        setTimeout(() => {
+                            this.jumpPressed = false;
+                        }, 100);
+                    }
+                });
+            }
+
+            getInputState() {
+                return {
+                    jumping: this.jumping,
+                    ducking: this.ducking
+                };
+            }
+
+            resetJump() {
+                this.jumping = false;
+            }
+        }
+
+        // ============================================================================
+        // PARTICLE SYSTEM
+        // ============================================================================
+        class ParticleSystem {
+            constructor() {
+                this.particles = [];
+            }
+
+            createExplosion(x, y, color, count = 8) {
+                for (let i = 0; i < count; i++) {
+                    const angle = (i / count) * Math.PI * 2;
+                    const vx = Math.cos(angle) * 3;
+                    const vy = Math.sin(angle) * 3 - 2;
+                    this.particles.push({
+                        x, y, vx, vy, life: 1, color,
+                        size: Math.random() * 3 + 2
+                    });
+                }
+            }
+
+            update(deltaTime) {
+                this.particles = this.particles.filter(p => p.life > 0);
+                this.particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2;
+                    p.life -= 0.02;
+                });
+            }
+
+            draw(ctx) {
+                this.particles.forEach(p => {
+                    ctx.save();
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+        }
+
+        // ============================================================================
+        // PLAYER CLASS
+        // ============================================================================
+        class Player {
+            constructor(characterName) {
+                // 캐릭터가 없으면 첫 번째 캐릭터로 폴백
+                const spriteKeys = Object.keys(spriteConfig.sprites);
+                this.character = spriteConfig.sprites[characterName] || spriteConfig.sprites[spriteKeys[0]];
+                this.x = GAME_CONFIG.playerStartX;
+                this.y = GAME_CONFIG.groundY - GAME_CONFIG.playerSize;
+                this.width = GAME_CONFIG.playerSize;
+                this.height = GAME_CONFIG.playerSize;
+                this.velocityY = 0;
+                this.isJumping = false;
+                this.isDucking = false;
+                this.frameIndex = 0;
+                this.doubleJumpAvailable = false;
+                this.activePowerUp = null;
+                this.powerUpTimer = 0;
+
+                this.hitbox = this.character.hitbox || { offsetX: 10, offsetY: 10, width: 44, height: 44 };
+            }
+
+            update(inputState, deltaTime) {
+                // Jump
+                if (inputState.jumping && !this.isJumping && !this.isDucking) {
+                    this.velocityY = GAME_CONFIG.jumpPower;
+                    this.isJumping = true;
+                    this.doubleJumpAvailable = true;
+                    audioManager.playJumpSound();
+                } else if (inputState.jumping && this.doubleJumpAvailable && this.isJumping) {
+                    this.velocityY = GAME_CONFIG.jumpPower;
+                    this.doubleJumpAvailable = false;
+                    audioManager.playJumpSound();
+                }
+
+                // Duck
+                this.isDucking = inputState.ducking && !this.isJumping;
+
+                // Apply gravity
+                this.velocityY += GAME_CONFIG.gravity;
+                this.y += this.velocityY;
+
+                // Ground collision
+                if (this.y + this.height >= GAME_CONFIG.groundY) {
+                    this.y = GAME_CONFIG.groundY - this.height;
+                    this.velocityY = 0;
+                    this.isJumping = false;
+                }
+
+                // Animation
+                this.frameIndex = (this.frameIndex + 0.15) % 100;
+
+                // Power-up timer
+                if (this.activePowerUp) {
+                    this.powerUpTimer -= deltaTime;
+                    if (this.powerUpTimer <= 0) {
+                        this.activePowerUp = null;
+                    }
+                }
+            }
+
+            getHitbox() {
+                return {
+                    x: this.x + this.hitbox.offsetX,
+                    y: this.y + this.hitbox.offsetY,
+                    width: this.hitbox.width,
+                    height: this.hitbox.height
+                };
+            }
+
+            draw(ctx) {
+                // 무적 상태일 때 캐릭터 깜빡임 효과
+                if (gameState.invulnTimer > 0) {
+                    const blinkRate = Math.floor(Date.now() / 100) % 2;
+                    ctx.globalAlpha = blinkRate === 0 ? 0.3 : 1.0;
+                }
+
+                if (this.character && this.character.drawSprite) {
+                    try {
+                        this.character.drawSprite(ctx, this.x, this.y, this.frameIndex, this.isJumping, this.isDucking);
+                    } catch(e) {
+                        // 폴백: 빨간 원
+                        ctx.fillStyle = '#FF4444';
+                        ctx.beginPath();
+                        ctx.arc(this.x + 32, this.y + 32, 28, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    // drawSprite 없을 때 폴백
+                    ctx.fillStyle = '#FF4444';
+                    ctx.beginPath();
+                    ctx.arc(this.x + 32, this.y + 32, 28, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = '14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('?', this.x + 32, this.y + 36);
+                }
+
+                // 무적 깜빡임 후 알파 복원
+                ctx.globalAlpha = 1.0;
+
+                // Power-up indicator
+                if (this.activePowerUp) {
+                    ctx.save();
+                    ctx.strokeStyle = '#FFD700';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y - 10, 28, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    const progress = this.powerUpTimer / 5;
+                    ctx.strokeStyle = '#FF6600';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y - 10, 25, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+        }
+
+        // ============================================================================
+        // OBSTACLE CLASS
+        // ============================================================================
+        class Obstacle {
+            constructor(type, score) {
+                this.type = type;
+                this.x = GAME_CONFIG.width;
+
+                // 새 장애물 유형들 (크기 업!)
+                const defs = {
+                    // 새 (큰 사이즈)
+                    'bird-low':     { w: 65, h: 45, y: GAME_CONFIG.groundY - 55,  color: '#FFB000' },
+                    'bird-mid':     { w: 65, h: 45, y: GAME_CONFIG.groundY - 110, color: '#FFB000' },
+                    'bird-high':    { w: 65, h: 45, y: GAME_CONFIG.groundY - 165, color: '#FFB000' },
+                    // 선인장 (크기 업)
+                    'cactus-small': { w: 40, h: 60,  y: GAME_CONFIG.groundY - 60,  color: '#00AA00' },
+                    'cactus-medium':{ w: 55, h: 80,  y: GAME_CONFIG.groundY - 80,  color: '#00BB00' },
+                    'cactus-large': { w: 65, h: 100, y: GAME_CONFIG.groundY - 100, color: '#00CC00' },
+                    // 바위
+                    'rock-small':   { w: 50, h: 40,  y: GAME_CONFIG.groundY - 40,  color: '#888888' },
+                    'rock-large':   { w: 70, h: 55,  y: GAME_CONFIG.groundY - 55,  color: '#777777' },
+                    // 물웅덩이 (낮고 넓음 — 점프해야 함)
+                    'puddle':       { w: 80, h: 20,  y: GAME_CONFIG.groundY - 10,  color: '#4488CC' },
+                    // 벌 (공중 작은 적)
+                    'bee':          { w: 45, h: 40,  y: GAME_CONFIG.groundY - 90 - Math.random() * 60, color: '#FFD700' },
+                    // 눈사람 (겨울)
+                    'snowman':      { w: 55, h: 80,  y: GAME_CONFIG.groundY - 80,  color: '#FFFFFF' },
+                    // 버섯 (봄)
+                    'mushroom':     { w: 45, h: 55,  y: GAME_CONFIG.groundY - 55,  color: '#FF4444' },
+                    // 나무 그루터기
+                    'stump':        { w: 55, h: 45,  y: GAME_CONFIG.groundY - 45,  color: '#8B5E3C' },
+                };
+
+                const def = defs[type] || defs['cactus-small'];
+                this.width = def.w;
+                this.height = def.h;
+                this.y = def.y;
+                this.color = def.color;
+
+                this.hitbox = {
+                    offsetX: 8,
+                    offsetY: 8,
+                    width: this.width - 16,
+                    height: this.height - 16
+                };
+
+                this.frameIndex = 0;
+            }
+
+            update(gameSpeed, deltaTime) {
+                this.x -= gameSpeed;
+                this.frameIndex += 0.1;
+            }
+
+            getHitbox() {
+                return {
+                    x: this.x + this.hitbox.offsetX,
+                    y: this.y + this.hitbox.offsetY,
+                    width: this.hitbox.width,
+                    height: this.hitbox.height
+                };
+            }
+
+            draw(ctx) {
+                ctx.save();
+                const cx = this.x + this.width / 2;
+                const cy = this.y + this.height / 2;
+
+                if (this.type.includes('bird')) {
+                    // 새 (크게)
+                    const bw = this.width * 0.45, bh = this.height * 0.4;
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.ellipse(cx - 5, cy, bw, bh, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 머리
+                    ctx.beginPath();
+                    ctx.arc(cx + bw - 2, cy - 3, bh * 0.8, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 눈
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath();
+                    ctx.arc(cx + bw + 2, cy - 5, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(cx + bw + 3, cy - 5, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 부리
+                    ctx.fillStyle = '#FF6600';
+                    ctx.beginPath();
+                    ctx.moveTo(cx + bw + 12, cy - 2);
+                    ctx.lineTo(cx + bw + 5, cy - 6);
+                    ctx.lineTo(cx + bw + 5, cy + 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    // 날개
+                    const wingFlap = Math.sin(this.frameIndex * 1.5) * 12;
+                    ctx.strokeStyle = '#CC8800';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 5, cy);
+                    ctx.quadraticCurveTo(cx - 15, cy - 15 + wingFlap, cx - bw, cy - 5 + wingFlap);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 5, cy);
+                    ctx.quadraticCurveTo(cx + 5, cy - 15 - wingFlap, cx + 15, cy - 10 - wingFlap);
+                    ctx.stroke();
+
+                } else if (this.type === 'bee') {
+                    // 벌
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, 16, 12, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 줄무늬
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(cx - 6, cy - 10, 4, 20);
+                    ctx.fillRect(cx + 3, cy - 10, 4, 20);
+                    // 날개
+                    const bwing = Math.sin(this.frameIndex * 3) * 5;
+                    ctx.fillStyle = 'rgba(200,220,255,0.6)';
+                    ctx.beginPath();
+                    ctx.ellipse(cx - 8, cy - 14 + bwing, 10, 6, -0.3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(cx + 8, cy - 14 - bwing, 10, 6, 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 눈
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(cx - 6, cy - 3, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(cx + 6, cy - 3, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 침
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + 16, cy + 2);
+                    ctx.lineTo(cx + 24, cy + 5);
+                    ctx.stroke();
+
+                } else if (this.type.includes('rock')) {
+                    // 바위
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 5, this.y + this.height);
+                    ctx.lineTo(this.x + 10, this.y + 5);
+                    ctx.lineTo(this.x + this.width * 0.4, this.y);
+                    ctx.lineTo(this.x + this.width * 0.7, this.y + 3);
+                    ctx.lineTo(this.x + this.width - 5, this.y + 8);
+                    ctx.lineTo(this.x + this.width, this.y + this.height);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.strokeStyle = '#555';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    // 하이라이트
+                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                    ctx.beginPath();
+                    ctx.arc(cx - 5, cy - 5, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                } else if (this.type === 'puddle') {
+                    // 물웅덩이
+                    ctx.fillStyle = 'rgba(60,130,200,0.6)';
+                    ctx.beginPath();
+                    ctx.ellipse(cx, this.y + this.height / 2, this.width / 2, this.height / 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 반짝임
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    ctx.beginPath();
+                    ctx.ellipse(cx - 10, this.y + 3, 8, 3, -0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(cx + 15, this.y + 5, 5, 2, 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                } else if (this.type === 'snowman') {
+                    // 눈사람
+                    ctx.fillStyle = '#FFFFFF';
+                    // 몸통 (아래)
+                    ctx.beginPath();
+                    ctx.arc(cx, this.y + this.height - 22, 22, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 머리 (위)
+                    ctx.beginPath();
+                    ctx.arc(cx, this.y + 20, 16, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 눈
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(cx - 6, this.y + 17, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(cx + 6, this.y + 17, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 코 (당근)
+                    ctx.fillStyle = '#FF6600';
+                    ctx.beginPath();
+                    ctx.moveTo(cx, this.y + 22);
+                    ctx.lineTo(cx + 12, this.y + 24);
+                    ctx.lineTo(cx, this.y + 26);
+                    ctx.closePath();
+                    ctx.fill();
+                    // 모자
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(cx - 14, this.y + 2, 28, 5);
+                    ctx.fillRect(cx - 10, this.y - 15, 20, 18);
+                    // 외곽선
+                    ctx.strokeStyle = '#CCCCDD';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(cx, this.y + this.height - 22, 22, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(cx, this.y + 20, 16, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                } else if (this.type === 'mushroom') {
+                    // 버섯
+                    // 줄기
+                    ctx.fillStyle = '#F5DEB3';
+                    ctx.fillRect(cx - 7, cy + 5, 14, this.height * 0.45);
+                    // 갓
+                    ctx.fillStyle = '#FF4444';
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, this.width * 0.42, Math.PI, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    // 점 무늬
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath(); ctx.arc(cx - 8, cy - 8, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 7, cy - 10, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx, cy - 14, 3.5, 0, Math.PI * 2); ctx.fill();
+                    // 외곽
+                    ctx.strokeStyle = '#CC0000';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, this.width * 0.42, Math.PI, 0);
+                    ctx.stroke();
+
+                } else if (this.type === 'stump') {
+                    // 나무 그루터기
+                    ctx.fillStyle = '#8B5E3C';
+                    ctx.fillRect(this.x + 8, this.y + 10, this.width - 16, this.height - 10);
+                    // 나이테 (윗면)
+                    ctx.fillStyle = '#A0724B';
+                    ctx.beginPath();
+                    ctx.ellipse(cx, this.y + 10, (this.width - 16) / 2, 10, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#6B3F1F';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    // 나이테 링
+                    ctx.strokeStyle = '#6B3F1F';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.ellipse(cx, this.y + 10, 10, 5, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.ellipse(cx, this.y + 10, 5, 3, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                } else {
+                    // 선인장 (기본)
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(this.x + 12, this.y, this.width - 24, this.height);
+                    // 가시
+                    ctx.fillStyle = '#009900';
+                    for (let i = 0; i < this.height; i += 14) {
+                        ctx.fillRect(this.x + 3, this.y + i, 8, 5);
+                        ctx.fillRect(this.x + this.width - 11, this.y + i, 8, 5);
+                    }
+                    // 팔
+                    if (this.type === 'cactus-medium' || this.type === 'cactus-large') {
+                        ctx.fillStyle = this.color;
+                        ctx.fillRect(this.x - 10, this.y + 18, 12, 10);
+                        ctx.fillRect(this.x + this.width - 2, this.y + 18, 12, 10);
+                    }
+                    if (this.type === 'cactus-large') {
+                        ctx.fillRect(this.x - 10, this.y + 50, 12, 10);
+                        ctx.fillRect(this.x + this.width - 2, this.y + 50, 12, 10);
+                    }
+                    // 외곽
+                    ctx.strokeStyle = '#005500';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(this.x + 12, this.y, this.width - 24, this.height);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // ============================================================================
+        // COIN CLASS
+        // ============================================================================
+        class Coin {
+            constructor() {
+                this.x = GAME_CONFIG.width;
+                this.y = GAME_CONFIG.groundY - 110 - Math.random() * 80;
+                this.radius = 20; // 14 → 20 (크기 업!)
+                this.frameIndex = 0;
+            }
+
+            update(gameSpeed, deltaTime) {
+                this.x -= gameSpeed;
+                this.frameIndex += 0.15;
+            }
+
+            getHitbox() {
+                return {
+                    x: this.x - this.radius,
+                    y: this.y - this.radius,
+                    width: this.radius * 2,
+                    height: this.radius * 2
+                };
+            }
+
+            draw(ctx) {
+                ctx.save();
+
+                // Rotate
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.frameIndex * 0.05);
+
+                // 그림자
+                ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                ctx.beginPath();
+                ctx.ellipse(2, 3, this.radius, this.radius * 0.7, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Coin body
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 내부 링
+                ctx.strokeStyle = '#DAA520';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius - 5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Shine
+                ctx.fillStyle = '#FFFF44';
+                ctx.beginPath();
+                ctx.arc(-5, -5, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Symbol
+                ctx.fillStyle = '#CC8800';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('★', 0, 1);
+
+                // Outline
+                ctx.strokeStyle = '#CC9900';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        // ============================================================================
+        // POWER-UP CLASS
+        // ============================================================================
+        class PowerUp {
+            constructor(type) {
+                this.type = type;
+                this.x = GAME_CONFIG.width;
+                this.y = GAME_CONFIG.groundY - 130 - Math.random() * 60;
+                this.radius = 26; // 20 → 26 (크기 업!)
+                this.frameIndex = 0;
+
+                if (type === 'shield') {
+                    this.color = '#0099FF';
+                    this.icon = '🛡';
+                } else if (type === 'magnet') {
+                    this.color = '#9900FF';
+                    this.icon = '🧲';
+                } else if (type === '2x') {
+                    this.color = '#FFD700';
+                    this.icon = 'x2';
+                } else if (type === 'slow') {
+                    this.color = '#00FF88';
+                    this.icon = '🐢';
+                }
+            }
+
+            update(gameSpeed, deltaTime) {
+                this.x -= gameSpeed;
+                this.frameIndex += 0.1;
+            }
+
+            getHitbox() {
+                return {
+                    x: this.x - this.radius,
+                    y: this.y - this.radius,
+                    width: this.radius * 2,
+                    height: this.radius * 2
+                };
+            }
+
+            draw(ctx) {
+                ctx.save();
+
+                // Glow
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 25;
+
+                // Body
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pulsing outline
+                const pulse = 2.5 + Math.sin(this.frameIndex) * 2.5;
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = pulse;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius + 4, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Icon
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 22px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.icon, this.x, this.y + 1);
+
+                ctx.restore();
+            }
+        }
+
+        // ============================================================================
+        // BACKGROUND CLASS - 계절 시스템 (봄 → 여름 → 가을 → 겨울)
+        // ============================================================================
+        // 계절 전환 기준 점수
+        const SEASONS = {
+            spring: { // 봄: 0~49점
+                skyTop: '#A8D8FF', skyMid: '#D4ECFF', skyBot: '#FFF0F5',
+                mountain: '#7BAE5E', mountainSnow: '#FFFFFF',
+                ground: '#55CC55', groundLine: '#44AA44',
+                cloudColor: '#FFFFFF',
+                label: '🌸 봄', particles: 'petals',
+                treeColor: '#FF99BB', treeTrunk: '#8B5E3C',
+                flowerColors: ['#FF69B4', '#FF85C8', '#FFB7D5', '#FFFFFF']
+            },
+            summer: { // 여름: 50~149점
+                skyTop: '#1E90FF', skyMid: '#66BBFF', skyBot: '#F0F8FF',
+                mountain: '#5A8A3A', mountainSnow: null,
+                ground: '#22AA22', groundLine: '#1A8A1A',
+                cloudColor: '#FFFFFF',
+                label: '☀️ 여름', particles: 'none',
+                treeColor: '#228B22', treeTrunk: '#654321',
+                flowerColors: ['#FFD700', '#FF6347', '#ADFF2F']
+            },
+            autumn: { // 가을: 150~299점
+                skyTop: '#FF8C42', skyMid: '#FFBA73', skyBot: '#FFE0B2',
+                mountain: '#B8860B', mountainSnow: null,
+                ground: '#CC9944', groundLine: '#AA7733',
+                cloudColor: '#FFE4C4',
+                label: '🍂 가을', particles: 'leaves',
+                treeColor: '#FF6600', treeTrunk: '#5C3317',
+                flowerColors: ['#FF4500', '#FF8C00', '#FFD700', '#8B4513']
+            },
+            winter: { // 겨울: 300점 이상
+                skyTop: '#4A6FA5', skyMid: '#8AACC8', skyBot: '#C8D8E8',
+                mountain: '#6A7B8B', mountainSnow: '#FFFFFF',
+                ground: '#E8E8F0', groundLine: '#B0B8C0',
+                cloudColor: '#D0D8E0',
+                label: '❄️ 겨울', particles: 'snow',
+                treeColor: null, treeTrunk: '#5C3317',
+                flowerColors: []
+            }
+        };
+
+        // 계절 순환: 봄→여름→가을→겨울→봄→여름→... (200점 주기)
+        function getCurrentSeason(score) {
+            const cycle = score % 200;
+            if (cycle < 50) return 'spring';
+            if (cycle < 100) return 'summer';
+            if (cycle < 150) return 'autumn';
+            return 'winter';
+        }
+
+        function lerpColor(c1, c2, t) {
+            // c1, c2 = '#RRGGBB'
+            const r1 = parseInt(c1.slice(1,3),16), g1 = parseInt(c1.slice(3,5),16), b1 = parseInt(c1.slice(5,7),16);
+            const r2 = parseInt(c2.slice(1,3),16), g2 = parseInt(c2.slice(3,5),16), b2 = parseInt(c2.slice(5,7),16);
+            const r = Math.round(r1 + (r2-r1)*t), g = Math.round(g1 + (g2-g1)*t), b = Math.round(b1 + (b2-b1)*t);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        class Background {
+            constructor() {
+                this.cloudX = 0;
+                this.time = 0;
+                this.weatherParticles = [];
+                this.currentSeason = 'spring';
+                this.transitionT = 0; // 0~1 전환 진행도
+                this.prevSeason = 'spring';
+                this.treePositions = [120, 350, 580, 780, 950]; // 나무 x좌표
+                this._cachedSeason = null; // 캐싱된 보간 결과
+                this._cachedTransitionT = -1; // 마지막 캐싱 시 transitionT
+                this._cachedSeasonKey = ''; // 캐시 키
+            }
+
+            update(deltaTime, score) {
+                this.cloudX -= 90 * deltaTime; // 초당 90px (deltaTime 기반으로 부드럽게)
+                // cloudX를 리셋하지 않음 — 구름/나무는 modulo로 위치 계산하므로
+                // 끊김 없이 무한 스크롤됨. float 오버플로 방지만 처리.
+                if (this.cloudX < -100000) this.cloudX += 100000;
+                this.time += deltaTime;
+
+                // 계절 전환
+                const newSeason = getCurrentSeason(score || 0);
+                if (newSeason !== this.currentSeason && this.transitionT >= 1) {
+                    this.prevSeason = this.currentSeason;
+                    this.currentSeason = newSeason;
+                    this.transitionT = 0;
+                }
+                if (this.transitionT < 1) {
+                    this.transitionT = Math.min(1, this.transitionT + deltaTime * 0.18); // ~5.5초에 걸쳐 부드럽게 전환
+                }
+
+                // 날씨 파티클 생성 (계절 전환 시 페이드인/아웃)
+                const currSeason = SEASONS[this.currentSeason];
+                const prevSeason = SEASONS[this.prevSeason];
+                const t = this.transitionT;
+
+                // 새 계절 파티클 (전환 진행에 따라 확률 증가)
+                const currRate = t >= 1 ? 1 : t;
+                // 이전 계절 파티클 (전환 진행에 따라 확률 감소)
+                const prevRate = t >= 1 ? 0 : (1 - t);
+
+                // 헬퍼: 파티클 타입별 생성
+                this._spawnParticles(currSeason, currRate);
+                if (prevRate > 0.05 && this.prevSeason !== this.currentSeason) {
+                    this._spawnParticles(prevSeason, prevRate);
+                }
+
+                // 파티클 업데이트
+                this.weatherParticles = this.weatherParticles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    if (p.type === 'snow') p.x += Math.sin(p.y * 0.02) * 0.5;
+                    if (p.rot !== undefined) p.rot += p.rotSpeed;
+                    return p.x > -20 && p.y < GAME_CONFIG.height + 10;
+                });
+                // 파티클 수 제한
+                if (this.weatherParticles.length > 60) {
+                    this.weatherParticles = this.weatherParticles.slice(-60);
+                }
+            }
+
+            _spawnParticles(season, rate) {
+                if (season.particles === 'snow' && Math.random() < 0.15 * rate) {
+                    this.weatherParticles.push({
+                        x: Math.random() * GAME_CONFIG.width,
+                        y: -5,
+                        vx: Math.random() * 2 - 1,
+                        vy: Math.random() * 1.5 + 1,
+                        size: Math.random() * 3 + 2,
+                        type: 'snow'
+                    });
+                }
+                if (season.particles === 'leaves' && Math.random() < 0.08 * rate) {
+                    const colors = season.flowerColors;
+                    if (colors.length > 0) {
+                        this.weatherParticles.push({
+                            x: GAME_CONFIG.width + 10,
+                            y: Math.random() * GAME_CONFIG.groundY * 0.7,
+                            vx: -(Math.random() * 3 + 2),
+                            vy: Math.random() * 1 + 0.5,
+                            rot: Math.random() * Math.PI * 2,
+                            rotSpeed: (Math.random() - 0.5) * 0.1,
+                            size: Math.random() * 6 + 4,
+                            color: colors[Math.floor(Math.random() * colors.length)],
+                            type: 'leaf'
+                        });
+                    }
+                }
+                if (season.particles === 'petals' && Math.random() < 0.12 * rate) {
+                    const colors = season.flowerColors;
+                    if (colors.length > 0) {
+                        this.weatherParticles.push({
+                            x: GAME_CONFIG.width + 10,
+                            y: Math.random() * GAME_CONFIG.groundY * 0.6,
+                            vx: -(Math.random() * 2 + 1),
+                            vy: Math.sin(this.time * 3) * 0.5 + 0.5,
+                            size: Math.random() * 4 + 3,
+                            color: colors[Math.floor(Math.random() * colors.length)],
+                            type: 'petal'
+                        });
+                    }
+                }
+            }
+
+            getSeason() {
+                const s = SEASONS[this.currentSeason];
+                if (this.transitionT >= 1 || this.prevSeason === this.currentSeason) {
+                    // 전환 완료 상태에서도 snowAlpha / treeAlpha 포함
+                    return Object.assign({}, s, {
+                        snowAlpha: s.mountainSnow ? 1 : 0,
+                        treeAlpha: s.treeColor ? 1 : 0,
+                        winterGroundAlpha: this.currentSeason === 'winter' ? 0.3 : 0
+                    });
+                }
+
+                // transitionT를 5% 단위로 스냅해서 캐시 히트율 높이기
+                const snappedT = Math.round(this.transitionT * 20) / 20;
+                const cacheKey = this.prevSeason + '_' + this.currentSeason + '_' + snappedT;
+                if (this._cachedSeasonKey === cacheKey && this._cachedSeason) {
+                    return this._cachedSeason;
+                }
+
+                const p = SEASONS[this.prevSeason];
+
+                // 나무 잎 색상 보간 (null인 겨울 처리)
+                let treeColorResult = s.treeColor;
+                let treeAlpha = s.treeColor ? 1 : 0;
+                if (p.treeColor && s.treeColor) {
+                    // 둘 다 잎이 있음 → 색상 보간
+                    treeColorResult = lerpColor(p.treeColor, s.treeColor, snappedT);
+                    treeAlpha = 1;
+                } else if (p.treeColor && !s.treeColor) {
+                    // 잎 있음 → 겨울(잎 없음): 페이드아웃
+                    treeColorResult = p.treeColor;
+                    treeAlpha = 1 - snappedT;
+                } else if (!p.treeColor && s.treeColor) {
+                    // 겨울(잎 없음) → 잎 있음: 페이드인
+                    treeColorResult = s.treeColor;
+                    treeAlpha = snappedT;
+                }
+
+                // 산 위 눈 알파 보간
+                const prevHasSnow = p.mountainSnow ? 1 : 0;
+                const currHasSnow = s.mountainSnow ? 1 : 0;
+                const snowAlpha = prevHasSnow + (currHasSnow - prevHasSnow) * snappedT;
+
+                // 겨울 땅 눈 효과 알파
+                const prevWinter = this.prevSeason === 'winter' ? 0.3 : 0;
+                const currWinter = this.currentSeason === 'winter' ? 0.3 : 0;
+                const winterGroundAlpha = prevWinter + (currWinter - prevWinter) * snappedT;
+
+                this._cachedSeason = {
+                    skyTop: lerpColor(p.skyTop, s.skyTop, snappedT),
+                    skyMid: lerpColor(p.skyMid, s.skyMid, snappedT),
+                    skyBot: lerpColor(p.skyBot, s.skyBot, snappedT),
+                    mountain: lerpColor(p.mountain, s.mountain, snappedT),
+                    mountainSnow: s.mountainSnow || p.mountainSnow,
+                    snowAlpha: snowAlpha,
+                    ground: lerpColor(p.ground, s.ground, snappedT),
+                    groundLine: lerpColor(p.groundLine, s.groundLine, snappedT),
+                    cloudColor: lerpColor(p.cloudColor, s.cloudColor, snappedT),
+                    label: s.label,
+                    particles: s.particles,
+                    prevParticles: p.particles,
+                    particleFade: snappedT,
+                    treeColor: treeColorResult,
+                    treeAlpha: treeAlpha,
+                    treeTrunk: lerpColor(p.treeTrunk, s.treeTrunk, snappedT),
+                    flowerColors: snappedT < 0.5 ? p.flowerColors : s.flowerColors,
+                    winterGroundAlpha: winterGroundAlpha
+                };
+                this._cachedSeasonKey = cacheKey;
+                return this._cachedSeason;
+            }
+
+            draw(ctx) {
+                const s = this.getSeason();
+
+                // 하늘 그라데이션 (캐싱)
+                const skyKey = s.skyTop + s.skyMid + s.skyBot;
+                if (this._skyKey !== skyKey) {
+                    this._skyGradient = ctx.createLinearGradient(0, 0, 0, GAME_CONFIG.height);
+                    this._skyGradient.addColorStop(0, s.skyTop);
+                    this._skyGradient.addColorStop(0.5, s.skyMid);
+                    this._skyGradient.addColorStop(1, s.skyBot);
+                    this._skyKey = skyKey;
+                }
+                ctx.fillStyle = this._skyGradient;
+                ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+
+                // 구름
+                for (let i = 0; i < 4; i++) {
+                    const cw = GAME_CONFIG.width + 200;
+                    const cx = ((this.cloudX * 0.8 + i * 320) % cw + cw) % cw - 50;
+                    this.drawCloud(ctx, cx, 60 + i * 35, s.cloudColor);
+                }
+
+                // 산
+                ctx.fillStyle = s.mountain;
+                ctx.beginPath();
+                ctx.moveTo(-50, GAME_CONFIG.groundY - 50);
+                ctx.lineTo(150, GAME_CONFIG.groundY - 180);
+                ctx.lineTo(350, GAME_CONFIG.groundY - 60);
+                ctx.lineTo(500, GAME_CONFIG.groundY - 200);
+                ctx.lineTo(700, GAME_CONFIG.groundY - 70);
+                ctx.lineTo(850, GAME_CONFIG.groundY - 160);
+                ctx.lineTo(GAME_CONFIG.width + 50, GAME_CONFIG.groundY - 80);
+                ctx.lineTo(GAME_CONFIG.width + 50, GAME_CONFIG.height);
+                ctx.lineTo(-50, GAME_CONFIG.height);
+                ctx.closePath();
+                ctx.fill();
+
+                // 산 위 눈 (봄, 겨울) — 페이드인/아웃
+                if (s.mountainSnow && s.snowAlpha > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = s.snowAlpha;
+                    ctx.fillStyle = s.mountainSnow;
+                    // 봉우리 1
+                    ctx.beginPath();
+                    ctx.moveTo(150, GAME_CONFIG.groundY - 180);
+                    ctx.lineTo(130, GAME_CONFIG.groundY - 145);
+                    ctx.lineTo(170, GAME_CONFIG.groundY - 145);
+                    ctx.closePath();
+                    ctx.fill();
+                    // 봉우리 2
+                    ctx.beginPath();
+                    ctx.moveTo(500, GAME_CONFIG.groundY - 200);
+                    ctx.lineTo(475, GAME_CONFIG.groundY - 160);
+                    ctx.lineTo(525, GAME_CONFIG.groundY - 160);
+                    ctx.closePath();
+                    ctx.fill();
+                    // 봉우리 3
+                    ctx.beginPath();
+                    ctx.moveTo(850, GAME_CONFIG.groundY - 160);
+                    ctx.lineTo(830, GAME_CONFIG.groundY - 130);
+                    ctx.lineTo(870, GAME_CONFIG.groundY - 130);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // 나무들
+                this.treePositions.forEach((tx, i) => {
+                    const scrolledX = ((tx + this.cloudX * 0.5) % (GAME_CONFIG.width + 100) + (GAME_CONFIG.width + 100)) % (GAME_CONFIG.width + 100) - 50;
+                    this.drawTree(ctx, scrolledX, GAME_CONFIG.groundY, s, i);
+                });
+
+                // 땅
+                ctx.fillStyle = s.ground;
+                ctx.fillRect(0, GAME_CONFIG.groundY, GAME_CONFIG.width, GAME_CONFIG.height - GAME_CONFIG.groundY);
+
+                // 땅 경계선
+                ctx.strokeStyle = s.groundLine;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, GAME_CONFIG.groundY);
+                ctx.lineTo(GAME_CONFIG.width, GAME_CONFIG.groundY);
+                ctx.stroke();
+
+                // 겨울 눈 쌓인 효과 (그라데이션 페이드)
+                if (s.winterGroundAlpha > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = s.winterGroundAlpha / 0.3; // 0~1 범위로 정규화
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.fillRect(0, GAME_CONFIG.groundY - 2, GAME_CONFIG.width, 6);
+                    ctx.restore();
+                }
+
+                // 날씨 파티클 그리기 (타입별 배치 렌더링)
+                ctx.save();
+                // 눈 파티클
+                ctx.fillStyle = '#FFFFFF';
+                ctx.globalAlpha = 0.8;
+                ctx.beginPath();
+                for (let i = 0; i < this.weatherParticles.length; i++) {
+                    const p = this.weatherParticles[i];
+                    if (p.type === 'snow') {
+                        ctx.moveTo(p.x + p.size, p.y);
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    }
+                }
+                ctx.fill();
+                ctx.restore();
+
+                // 잎/꽃잎 파티클
+                for (let i = 0; i < this.weatherParticles.length; i++) {
+                    const p = this.weatherParticles[i];
+                    if (p.type === 'leaf') {
+                        ctx.save();
+                        ctx.translate(p.x, p.y);
+                        ctx.rotate(p.rot || 0);
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.ellipse(0, 0, p.size, p.size * 0.5, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    } else if (p.type === 'petal') {
+                        ctx.save();
+                        ctx.globalAlpha = 0.7;
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.ellipse(p.x, p.y, p.size, p.size * 0.6, Math.sin(p.x * 0.1) * 0.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
+
+                // 계절 표시 (좌하단)
+                ctx.save();
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.beginPath();
+                ctx.roundRect(GAME_CONFIG.width - 120, GAME_CONFIG.groundY - 35, 110, 28, 8);
+                ctx.fill();
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(SEASONS[this.currentSeason].label, GAME_CONFIG.width - 65, GAME_CONFIG.groundY - 21);
+                ctx.restore();
+            }
+
+            drawCloud(ctx, x, y, color) {
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.7;
+                ctx.beginPath();
+                ctx.arc(x, y, 22, 0, Math.PI * 2);
+                ctx.arc(x + 22, y - 5, 28, 0, Math.PI * 2);
+                ctx.arc(x + 50, y, 22, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            drawTree(ctx, x, groundY, season, index) {
+                const trunkH = 40 + (index % 3) * 10;
+                // 줄기
+                ctx.fillStyle = season.treeTrunk;
+                ctx.fillRect(x - 4, groundY - trunkH, 8, trunkH);
+
+                const treeAlpha = season.treeAlpha !== undefined ? season.treeAlpha : (season.treeColor ? 1 : 0);
+                const winterAlpha = 1 - treeAlpha; // 나뭇잎이 사라질수록 가지가 나타남
+
+                // 나뭇잎 (페이드인/아웃)
+                if (season.treeColor && treeAlpha > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = treeAlpha;
+                    ctx.fillStyle = season.treeColor;
+                    ctx.beginPath();
+                    ctx.arc(x, groundY - trunkH - 15, 20 + (index % 2) * 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(x - 12, groundY - trunkH - 5, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(x + 12, groundY - trunkH - 5, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // 겨울 앙상한 가지 + 눈 (페이드인/아웃)
+                if (winterAlpha > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = winterAlpha;
+                    ctx.strokeStyle = season.treeTrunk;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x, groundY - trunkH);
+                    ctx.lineTo(x - 15, groundY - trunkH - 20);
+                    ctx.moveTo(x, groundY - trunkH);
+                    ctx.lineTo(x + 15, groundY - trunkH - 18);
+                    ctx.moveTo(x, groundY - trunkH + 10);
+                    ctx.lineTo(x - 10, groundY - trunkH - 5);
+                    ctx.stroke();
+                    // 눈
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(x - 15, groundY - trunkH - 22, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(x + 15, groundY - trunkH - 20, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+        }
+
+        // ============================================================================
+        // SCENE CLASSES
+        // ============================================================================
+        class TitleScene {
+            constructor() {
+                this.bounceY = 0;
+                this.bounceSpeed = 0.3;
+                this.charFrame = 0;
+                this.bg = new Background();
+            }
+
+            update(deltaTime) {
+                this.bounceY += this.bounceSpeed;
+                if (this.bounceY > 15 || this.bounceY < 0) this.bounceSpeed *= -1;
+                this.charFrame += 0.05;
+                this.bg.update(deltaTime * 0.3);
+            }
+
+            draw(ctx) {
+                this.bg.draw(ctx);
+
+                // 반투명 패널
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                ctx.beginPath();
+                ctx.roundRect(GAME_CONFIG.width/2 - 280, 40, 560, 490, 20);
+                ctx.fill();
+                ctx.strokeStyle = '#0099FF';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // 제목
+                ctx.fillStyle = '#FF4444';
+                ctx.strokeStyle = '#CC0000';
+                ctx.lineWidth = 3;
+                ctx.font = 'bold 60px Arial';
+                ctx.strokeText('동그라미 런', GAME_CONFIG.width/2, 95 - this.bounceY * 0.5);
+                ctx.fillText('동그라미 런', GAME_CONFIG.width/2, 95 - this.bounceY * 0.5);
+
+                // 선택된 캐릭터 미리보기
+                const charKey = gameState.selectedCharacter;
+                const char = spriteConfig.sprites[charKey];
+                if (char && char.drawSprite) {
+                    char.drawSprite(ctx, GAME_CONFIG.width/2 - 32, 130, this.charFrame, false, false);
+                }
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText(char ? char.name : '동그라미', GAME_CONFIG.width/2, 210);
+
+                // 최고 점수 / 동전
+                ctx.fillStyle = '#555';
+                ctx.font = '22px Arial';
+                ctx.fillText(`최고 점수: ${gameState.bestScore}  |  보유 동전: ${gameState.totalCoins}`, GAME_CONFIG.width/2, 250);
+
+                // 게임 시작 버튼
+                ctx.fillStyle = '#0099FF';
+                ctx.beginPath();
+                ctx.roundRect(GAME_CONFIG.width/2 - 150, 290, 300, 65, 12);
+                ctx.fill();
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 32px Arial';
+                ctx.fillText('게임 시작!', GAME_CONFIG.width/2, 323);
+
+                // 캐릭터 선택 버튼
+                ctx.fillStyle = '#FF8800';
+                ctx.beginPath();
+                ctx.roundRect(GAME_CONFIG.width/2 - 150, 375, 300, 55, 12);
+                ctx.fill();
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 26px Arial';
+                ctx.fillText('캐릭터 선택', GAME_CONFIG.width/2, 403);
+
+                // 조작법 안내
+                ctx.fillStyle = '#888';
+                ctx.font = '16px Arial';
+                ctx.fillText('탭 = 점프 / 더블탭 = 더블점프 / 아래 스와이프 = 숙이기', GAME_CONFIG.width/2, 465);
+
+                ctx.restore();
+            }
+
+            handleInput(inputState) {
+                if (!inputState.jumping) return;
+                const mx = inputManager.lastTouchX;
+                const my = inputManager.lastTouchY;
+                if (mx === undefined || my === undefined) return;
+
+                const cx = GAME_CONFIG.width / 2;
+                // 게임 시작 버튼 영역
+                if (mx >= cx - 150 && mx <= cx + 150 && my >= 290 && my <= 355) {
+                    gameState.score = 0;
+                    gameState.coins = 0;
+                    gameState.coinsEarned = 0;
+                    gameState.lives = gameState.maxLives;
+                    gameState.invulnTimer = 0;
+                    gameState.currentScene = 'game';
+                    gameState.isRunning = true;
+                    gameState.isPaused = false;
+                    gameState.gameStartTime = Date.now();
+                    if (typeof engine !== 'undefined' && engine.scenes) {
+                        engine.scenes.game = null;
+                        engine.scenes.gameOver = null;
+                    }
+                }
+                // 캐릭터 선택 버튼 영역
+                if (mx >= cx - 150 && mx <= cx + 150 && my >= 375 && my <= 430) {
+                    gameState.currentScene = 'select';
+                }
+            }
+        }
+
+        // ============================================================================
+        // CHARACTER SELECT SCENE
+        // ============================================================================
+        class SelectScene {
+            constructor() {
+                this.charFrame = 0;
+                this.bg = new Background();
+                this.message = '';
+                this.messageTimer = 0;
+            }
+
+            update(deltaTime) {
+                this.charFrame += 0.05;
+                this.bg.update(deltaTime * 0.2);
+                if (this.messageTimer > 0) this.messageTimer -= deltaTime;
+            }
+
+            draw(ctx) {
+                this.bg.draw(ctx);
+
+                // 메인 패널
+                ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                ctx.beginPath();
+                ctx.roundRect(30, 20, GAME_CONFIG.width - 60, GAME_CONFIG.height - 40, 20);
+                ctx.fill();
+                ctx.strokeStyle = '#FF8800';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // 제목
+                ctx.fillStyle = '#FF8800';
+                ctx.font = 'bold 40px Arial';
+                ctx.fillText('캐릭터 선택', GAME_CONFIG.width/2, 60);
+
+                // 보유 동전
+                ctx.fillStyle = '#FFD700';
+                ctx.font = 'bold 24px Arial';
+                ctx.fillText(`보유 동전: ${gameState.totalCoins}`, GAME_CONFIG.width/2, 100);
+
+                // 캐릭터 그리드 (5개)
+                const keys = Object.keys(spriteConfig.sprites);
+                const cols = Math.min(keys.length, 5);
+                const cellW = 150;
+                const cellH = 180;
+                const startX = GAME_CONFIG.width/2 - (cols * cellW) / 2;
+                const startY = 130;
+
+                keys.forEach((key, i) => {
+                    const char = spriteConfig.sprites[key];
+                    const col = i % cols;
+                    const cx = startX + col * cellW + cellW / 2;
+                    const cy = startY + cellH / 2;
+                    const isSelected = gameState.selectedCharacter === key;
+                    const isUnlocked = gameState.unlockedCharacters.includes(key);
+
+                    // 카드 배경
+                    ctx.fillStyle = isSelected ? '#E0F0FF' : '#F5F5F5';
+                    ctx.strokeStyle = isSelected ? '#0099FF' : '#DDD';
+                    ctx.lineWidth = isSelected ? 3 : 1;
+                    ctx.beginPath();
+                    ctx.roundRect(cx - 60, startY, 120, cellH - 10, 10);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // 캐릭터 그리기 (잠긴 것도 반투명으로 보여줌)
+                    if (char.drawSprite) {
+                        if (!isUnlocked) ctx.globalAlpha = 0.35;
+                        try {
+                            char.drawSprite(ctx, cx - 32, startY + 15, this.charFrame, false, false);
+                        } catch(e) {
+                            ctx.fillStyle = char.colors ? char.colors.main : '#CCC';
+                            ctx.beginPath();
+                            ctx.arc(cx, startY + 50, 22, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    if (!isUnlocked) {
+                        // 잠금 아이콘 오버레이
+                        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                        ctx.beginPath();
+                        ctx.arc(cx, startY + 47, 25, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#FFF';
+                        ctx.font = 'bold 28px Arial';
+                        ctx.fillText('🔒', cx, startY + 50);
+                    }
+
+                    // 이름
+                    ctx.fillStyle = '#333';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText(char.name, cx, startY + cellH - 50);
+
+                    // 가격 또는 상태
+                    if (isSelected && isUnlocked) {
+                        ctx.fillStyle = '#0099FF';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.fillText('✓ 선택됨', cx, startY + cellH - 30);
+                    } else if (isUnlocked) {
+                        ctx.fillStyle = '#22BB22';
+                        ctx.font = '14px Arial';
+                        ctx.fillText('보유중', cx, startY + cellH - 30);
+                    } else {
+                        ctx.fillStyle = '#FF8800';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.fillText(`${char.cost} 동전`, cx, startY + cellH - 30);
+                    }
+                });
+
+                // 메시지 표시
+                if (this.messageTimer > 0 && this.message) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                    ctx.beginPath();
+                    ctx.roundRect(GAME_CONFIG.width/2 - 180, GAME_CONFIG.height - 120, 360, 40, 10);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFDD00';
+                    ctx.font = 'bold 18px Arial';
+                    ctx.fillText(this.message, GAME_CONFIG.width/2, GAME_CONFIG.height - 100);
+                }
+
+                // 뒤로가기 버튼
+                ctx.fillStyle = '#666';
+                ctx.beginPath();
+                ctx.roundRect(GAME_CONFIG.width/2 - 80, GAME_CONFIG.height - 65, 160, 45, 10);
+                ctx.fill();
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText('← 돌아가기', GAME_CONFIG.width/2, GAME_CONFIG.height - 42);
+
+                ctx.restore();
+            }
+
+            handleInput(inputState) {
+                if (!inputState.jumping) return;
+                const mx = inputManager.lastTouchX;
+                const my = inputManager.lastTouchY;
+                if (mx === undefined || my === undefined) return;
+
+                // 돌아가기 버튼
+                if (mx >= GAME_CONFIG.width/2 - 80 && mx <= GAME_CONFIG.width/2 + 80 &&
+                    my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 20) {
+                    gameState.currentScene = 'title';
+                    localStorage.setItem('selectedCharacter', gameState.selectedCharacter);
+                    return;
+                }
+
+                // 캐릭터 카드 클릭 판정
+                const keys = Object.keys(spriteConfig.sprites);
+                const cols = Math.min(keys.length, 5);
+                const cellW = 150;
+                const cellH = 180;
+                const startX = GAME_CONFIG.width/2 - (cols * cellW) / 2;
+                const startY = 130;
+
+                keys.forEach((key, i) => {
+                    const char = spriteConfig.sprites[key];
+                    const col = i % cols;
+                    const cx = startX + col * cellW + cellW / 2;
+                    const isUnlocked = gameState.unlockedCharacters.includes(key);
+
+                    if (mx >= cx - 60 && mx <= cx + 60 && my >= startY && my <= startY + cellH - 10) {
+                        if (isUnlocked) {
+                            gameState.selectedCharacter = key;
+                            localStorage.setItem('selectedCharacter', key);
+                            this.message = `${char.name} 선택 완료!`;
+                            this.messageTimer = 1.5;
+                        } else if (gameState.totalCoins >= char.cost) {
+                            // 구매!
+                            gameState.totalCoins -= char.cost;
+                            gameState.unlockedCharacters.push(key);
+                            gameState.selectedCharacter = key;
+                            localStorage.setItem('totalCoins', gameState.totalCoins);
+                            localStorage.setItem('unlockedCharacters', JSON.stringify(gameState.unlockedCharacters));
+                            localStorage.setItem('selectedCharacter', key);
+                            this.message = `${char.name} 구매 완료! 🎉`;
+                            this.messageTimer = 2;
+                            audioManager.playPowerUpSound();
+                        } else {
+                            this.message = `동전이 부족해요! (${char.cost - gameState.totalCoins}개 더 필요)`;
+                            this.messageTimer = 2;
+                        }
+                    }
+                });
+            }
+        }
+
+        class GameScene {
+            constructor() {
+                this.background = new Background();
+                this.player = new Player(gameState.selectedCharacter);
+                this.obstacles = [];
+                this.coins = [];
+                this.powerUps = [];
+                this.particles = new ParticleSystem();
+                this.obstacleTimer = 3.0; // 첫 장애물까지 3초 대기
+                this.coinTimer = 1.5;
+                this.powerUpTimer = 8.0;
+                this.seasonBanner = null; // { text, timer }
+                this.lastSeason = 'spring';
+            }
+
+            update(inputState, deltaTime) {
+                if (gameState.isPaused) return;
+
+                this.background.update(deltaTime, gameState.score);
+
+                // 계절 전환 감지 → 배너 표시
+                const newSeason = getCurrentSeason(gameState.score);
+                if (newSeason !== this.lastSeason) {
+                    const labels = { spring: '🌸 봄이 왔어요!', summer: '☀️ 여름이 왔어요!', autumn: '🍂 가을이 왔어요!', winter: '❄️ 겨울이 왔어요!' };
+                    this.seasonBanner = { text: labels[newSeason], timer: 3.0 };
+                    this.lastSeason = newSeason;
+                }
+                if (this.seasonBanner && this.seasonBanner.timer > 0) {
+                    this.seasonBanner.timer -= deltaTime;
+                }
+
+                this.player.update(inputState, deltaTime);
+                this.particles.update(deltaTime);
+
+                // Update speed
+                gameState.gameSpeed = Math.min(
+                    GAME_CONFIG.maxSpeed,
+                    GAME_CONFIG.initialSpeed + gameState.score * GAME_CONFIG.speedIncrease
+                );
+
+                // Spawn obstacles (deltaTime 기반 — 끊김 방지)
+                this.obstacleTimer -= deltaTime;
+                if (this.obstacleTimer <= 0) {
+                    this.spawnObstacle();
+                    this.obstacleTimer = 2.5 + Math.random() * 2.5;
+                }
+
+                // Spawn coins
+                this.coinTimer -= deltaTime;
+                if (this.coinTimer <= 0) {
+                    if (Math.random() < 0.4) {
+                        this.coins.push(new Coin());
+                    }
+                    this.coinTimer = 1.2 + Math.random() * 1.0;
+                }
+
+                // Spawn power-ups
+                this.powerUpTimer -= deltaTime;
+                if (this.powerUpTimer <= 0) {
+                    if (Math.random() < 0.3) {
+                        const types = ['shield', 'magnet', '2x', 'slow'];
+                        this.powerUps.push(new PowerUp(types[Math.floor(Math.random() * types.length)]));
+                    }
+                    this.powerUpTimer = 6.0 + Math.random() * 4.0;
+                }
+
+                // Update obstacles
+                this.obstacles = this.obstacles.filter(o => {
+                    o.update(gameState.gameSpeed, deltaTime);
+                    return o.x + o.width > 0;
+                });
+
+                // Update coins
+                this.coins = this.coins.filter(c => {
+                    c.update(gameState.gameSpeed, deltaTime);
+                    return c.x + c.radius > 0;
+                });
+
+                // Update power-ups
+                this.powerUps = this.powerUps.filter(p => {
+                    p.update(gameState.gameSpeed, deltaTime);
+                    return p.x + p.radius > 0;
+                });
+
+                // Collision detection
+                this.checkCollisions(deltaTime);
+
+                // Score increment (초당 ~10점)
+                gameState.score += deltaTime * 10;
+            }
+
+            spawnObstacle() {
+                const score = gameState.score;
+                const season = getCurrentSeason(score);
+                let pool;
+
+                if (score < 30) {
+                    // 초반: 작은 장애물만
+                    pool = ['cactus-small', 'rock-small', 'mushroom'];
+                } else if (score < 70) {
+                    // 중반 초기: 기본 + 계절별
+                    const base = ['cactus-small', 'cactus-medium', 'rock-small', 'stump', 'bird-low'];
+                    pool = this._addSeasonObstacles(base, season);
+                } else if (score < 150) {
+                    // 중반: 다양한 장애물
+                    const base = ['cactus-small', 'cactus-medium', 'cactus-large', 'rock-small', 'rock-large',
+                                  'bird-low', 'bird-mid', 'stump', 'bee', 'puddle'];
+                    pool = this._addSeasonObstacles(base, season);
+                } else {
+                    // 후반: 모든 장애물
+                    const base = ['cactus-small', 'cactus-medium', 'cactus-large', 'rock-small', 'rock-large',
+                                  'bird-low', 'bird-mid', 'bird-high', 'stump', 'bee', 'puddle', 'mushroom'];
+                    pool = this._addSeasonObstacles(base, season);
+                }
+
+                const type = pool[Math.floor(Math.random() * pool.length)];
+                this.obstacles.push(new Obstacle(type, score));
+            }
+
+            _addSeasonObstacles(base, season) {
+                const pool = [...base];
+                if (season === 'winter') {
+                    pool.push('snowman', 'snowman'); // 겨울: 눈사람 가중치
+                } else if (season === 'spring') {
+                    pool.push('mushroom', 'mushroom'); // 봄: 버섯 가중치
+                } else if (season === 'summer') {
+                    pool.push('bee', 'bee', 'puddle'); // 여름: 벌/웅덩이 가중치
+                } else if (season === 'autumn') {
+                    pool.push('stump', 'stump', 'rock-large'); // 가을: 그루터기/바위 가중치
+                }
+                return pool;
+            }
+
+            checkCollisions(deltaTime) {
+                const playerHitbox = this.player.getHitbox();
+
+                // 무적 타이머 감소
+                if (gameState.invulnTimer > 0) gameState.invulnTimer -= deltaTime;
+
+                // Check obstacle collisions
+                this.obstacles.forEach(obstacle => {
+                    if (this.checkAABBCollision(playerHitbox, obstacle.getHitbox())) {
+                        if (this.player.activePowerUp === 'shield') {
+                            // 쉴드로 파괴
+                            this.particles.createExplosion(obstacle.x, obstacle.y, '#FF00FF', 12);
+                            this.obstacles = this.obstacles.filter(o => o !== obstacle);
+                            this.player.activePowerUp = null;
+                        } else if (gameState.invulnTimer <= 0) {
+                            // 하트 감소
+                            gameState.lives--;
+                            gameState.invulnTimer = 2.0; // 2초 무적
+                            this.particles.createExplosion(obstacle.x, obstacle.y, '#FF0000', 10);
+                            this.obstacles = this.obstacles.filter(o => o !== obstacle);
+                            audioManager.playJumpSound(); // 피격음
+
+                            if (gameState.lives <= 0) {
+                                gameState.isRunning = false;
+                                gameState.currentScene = 'gameOver';
+                                audioManager.playGameOverSound();
+                            }
+                        }
+                    }
+                });
+
+                // Check coin collisions
+                this.coins.forEach(coin => {
+                    if (this.checkAABBCollision(playerHitbox, coin.getHitbox())) {
+                        gameState.coins++;
+                        gameState.coinsEarned++;
+                        this.particles.createExplosion(coin.x, coin.y, '#FFD700', 6);
+                        this.coins = this.coins.filter(c => c !== coin);
+                        audioManager.playCoinSound();
+                    }
+                });
+
+                // Check power-up collisions
+                this.powerUps.forEach(pu => {
+                    if (this.checkAABBCollision(playerHitbox, pu.getHitbox())) {
+                        this.player.activePowerUp = pu.type;
+                        this.player.powerUpTimer = 5; // 5초 지속
+                        this.particles.createExplosion(pu.x, pu.y, pu.color, 10);
+                        this.powerUps = this.powerUps.filter(p => p !== pu);
+                        audioManager.playPowerUpSound();
+                    }
+                });
+            }
+
+            checkAABBCollision(rect1, rect2) {
+                return rect1.x < rect2.x + rect2.width &&
+                    rect1.x + rect1.width > rect2.x &&
+                    rect1.y < rect2.y + rect2.height &&
+                    rect1.y + rect1.height > rect2.y;
+            }
+
+            draw(ctx) {
+                this.background.draw(ctx);
+                this.particles.draw(ctx);
+                this.player.draw(ctx);
+                this.obstacles.forEach(o => o.draw(ctx));
+                this.coins.forEach(c => c.draw(ctx));
+                this.powerUps.forEach(p => p.draw(ctx));
+
+                // HUD
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 28px Arial';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(`점수: ${Math.floor(gameState.score)}`, 20, 20);
+
+                ctx.font = 'bold 24px Arial';
+                ctx.fillText(`동전: ${gameState.coins}`, 20, 60);
+
+                // Pause button
+                ctx.fillStyle = '#FFFFFF';
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.fillRect(GAME_CONFIG.width - 70, 20, 50, 50);
+                ctx.strokeRect(GAME_CONFIG.width - 70, 20, 50, 50);
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 32px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('⏸', GAME_CONFIG.width - 45, 45);
+
+                // 하트(생명) 표시
+                ctx.font = '28px Arial';
+                ctx.textAlign = 'left';
+                for (let i = 0; i < gameState.maxLives; i++) {
+                    ctx.fillStyle = i < gameState.lives ? '#FF0000' : '#555555';
+                    ctx.fillText(i < gameState.lives ? '❤️' : '🖤', 20 + i * 35, 100);
+                }
+
+                // 피격 무적 표시
+                if (gameState.invulnTimer > 0) {
+                    ctx.fillStyle = 'rgba(255,0,0,0.3)';
+                    ctx.fillRect(0, 0, GAME_CONFIG.width, 5);
+                }
+
+                // 계절 전환 배너
+                if (this.seasonBanner && this.seasonBanner.timer > 0) {
+                    ctx.save();
+                    const alpha = Math.min(1, this.seasonBanner.timer / 0.5); // 마지막 0.5초 페이드아웃
+                    ctx.globalAlpha = alpha;
+
+                    // 배너 배경
+                    const bw = 400, bh = 70;
+                    const bx = GAME_CONFIG.width / 2 - bw / 2;
+                    const by = 120;
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.beginPath();
+                    ctx.roundRect(bx, by, bw, bh, 16);
+                    ctx.fill();
+
+                    // 배너 텍스트
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 36px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.seasonBanner.text, GAME_CONFIG.width / 2, by + bh / 2);
+
+                    ctx.restore();
+                }
+            }
+
+            handleInput(inputState) {
+                // Pause button hit detection (simplified)
+                // Would need mouse position tracking for real implementation
+            }
+        }
+
+        class GameOverScene {
+            constructor() {
+                // 기록 저장
+                this.finalScore = Math.floor(gameState.score);
+                this.finalCoins = gameState.coins;
+                this.isNewBest = this.finalScore > gameState.bestScore;
+                gameState.bestScore = Math.max(gameState.bestScore, this.finalScore);
+                gameState.bestCoins = Math.max(gameState.bestCoins, this.finalCoins);
+                gameState.totalCoins += this.finalCoins;
+                localStorage.setItem('bestScore', gameState.bestScore);
+                localStorage.setItem('bestCoins', gameState.bestCoins);
+                localStorage.setItem('totalCoins', gameState.totalCoins);
+
+                // 게임 시간 계산
+                this.playTime = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
+                this.playMinutes = Math.floor(this.playTime / 60);
+                this.playSeconds = this.playTime % 60;
+
+                // 도달한 계절
+                const seasonLabels = { spring: '봄 🌸', summer: '여름 ☀️', autumn: '가을 🍂', winter: '겨울 ❄️' };
+                this.reachedSeason = seasonLabels[getCurrentSeason(this.finalScore)] || '봄 🌸';
+
+                // 입력 차단: 2초 동안 버튼 비활성 + 터치 좌표 초기화
+                this.inputDelay = 2.0;
+                this.buttonsReady = false;
+                inputManager.lastTouchX = undefined;
+                inputManager.lastTouchY = undefined;
+                inputManager.jumping = false;
+                inputManager.jumpPressed = false;
+
+                // 배경 (한 번만 생성)
+                this.bg = new Background();
+
+                // 등장 애니메이션
+                this.animTime = 0;
+            }
+
+            update(deltaTime) {
+                this.animTime += deltaTime;
+                if (this.inputDelay > 0) {
+                    this.inputDelay -= deltaTime;
+                    if (this.inputDelay <= 0) {
+                        this.buttonsReady = true;
+                        // 버튼 활성화 시점에 다시 터치 좌표 클리어
+                        inputManager.lastTouchX = undefined;
+                        inputManager.lastTouchY = undefined;
+                        inputManager.jumping = false;
+                        inputManager.jumpPressed = false;
+                    }
+                }
+                this.bg.update(deltaTime * 0.1); // 배경 아주 느리게 움직임
+            }
+
+            draw(ctx) {
+                this.bg.draw(ctx);
+
+                // 어두운 오버레이
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                const cx = GAME_CONFIG.width / 2;
+
+                // 메인 패널 (등장 애니메이션)
+                const panelAlpha = Math.min(1, this.animTime / 0.5);
+                ctx.globalAlpha = panelAlpha;
+
+                const pw = 480, ph = 460;
+                const px = cx - pw / 2, py = 55;
+                ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                ctx.beginPath();
+                ctx.roundRect(px, py, pw, ph, 20);
+                ctx.fill();
+                ctx.strokeStyle = '#FF4444';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 게임 오버 제목
+                ctx.fillStyle = '#FF4444';
+                ctx.font = 'bold 48px Arial';
+                ctx.fillText('게임 오버!', cx, py + 50);
+
+                // 신기록 표시
+                if (this.isNewBest) {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.font = 'bold 22px Arial';
+                    ctx.fillText('⭐ 신기록 달성! ⭐', cx, py + 85);
+                }
+
+                // 구분선
+                const summaryY = this.isNewBest ? py + 110 : py + 95;
+                ctx.strokeStyle = '#EEE';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(px + 40, summaryY);
+                ctx.lineTo(px + pw - 40, summaryY);
+                ctx.stroke();
+
+                // 게임 플레이 Summary
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText('📊 플레이 요약', cx, summaryY + 28);
+
+                ctx.font = '22px Arial';
+                ctx.fillStyle = '#444';
+                const lineH = 36;
+                let ly = summaryY + 65;
+
+                // 최종 점수
+                ctx.textAlign = 'left';
+                ctx.fillText('최종 점수', px + 60, ly);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#0066CC';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText(`${this.finalScore}점`, px + pw - 60, ly);
+
+                // 최고 점수
+                ly += lineH;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#444';
+                ctx.font = '22px Arial';
+                ctx.fillText('최고 점수', px + 60, ly);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#FF8800';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText(`${gameState.bestScore}점`, px + pw - 60, ly);
+
+                // 획득 동전
+                ly += lineH;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#444';
+                ctx.font = '22px Arial';
+                ctx.fillText('획득한 동전', px + 60, ly);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#FFB700';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText(`${this.finalCoins}개`, px + pw - 60, ly);
+
+                // 플레이 시간
+                ly += lineH;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#444';
+                ctx.font = '22px Arial';
+                ctx.fillText('플레이 시간', px + 60, ly);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#555';
+                ctx.font = 'bold 22px Arial';
+                const timeStr = this.playMinutes > 0
+                    ? `${this.playMinutes}분 ${this.playSeconds}초`
+                    : `${this.playSeconds}초`;
+                ctx.fillText(timeStr, px + pw - 60, ly);
+
+                // 도달 계절
+                ly += lineH;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#444';
+                ctx.font = '22px Arial';
+                ctx.fillText('마지막 계절', px + 60, ly);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#22AA22';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText(this.reachedSeason, px + pw - 60, ly);
+
+                // 버튼 영역
+                const btnY = py + ph - 75;
+                const btnW = 180, btnH = 55;
+                const retryX = cx - btnW - 15;
+                const menuX = cx + 15;
+
+                if (this.buttonsReady) {
+                    // 다시하기 버튼
+                    ctx.fillStyle = '#0099FF';
+                    ctx.beginPath();
+                    ctx.roundRect(retryX, btnY, btnW, btnH, 12);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🔄 다시하기', retryX + btnW / 2, btnY + btnH / 2);
+
+                    // 메인메뉴 버튼
+                    ctx.fillStyle = '#FF6600';
+                    ctx.beginPath();
+                    ctx.roundRect(menuX, btnY, btnW, btnH, 12);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillText('🏠 메인메뉴', menuX + btnW / 2, btnY + btnH / 2);
+                } else {
+                    // 버튼 비활성 상태
+                    ctx.fillStyle = '#AAAAAA';
+                    ctx.beginPath();
+                    ctx.roundRect(retryX, btnY, btnW, btnH, 12);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.roundRect(menuX, btnY, btnW, btnH, 12);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = '20px Arial';
+                    ctx.textAlign = 'center';
+                    const waitSec = Math.ceil(this.inputDelay);
+                    ctx.fillText(`잠시만요... (${waitSec}초)`, cx, btnY + btnH / 2);
+                }
+
+                ctx.restore();
+            }
+
+            handleInput(inputState) {
+                // 버튼이 준비되지 않았으면 모든 입력 무시
+                if (!this.buttonsReady) return;
+                if (!inputState.jumping) return;
+
+                const mx = inputManager.lastTouchX;
+                const my = inputManager.lastTouchY;
+                if (mx === undefined || my === undefined) return;
+
+                const cx = GAME_CONFIG.width / 2;
+                const pw = 480, ph = 460;
+                const btnY = 55 + ph - 75;
+                const btnW = 180, btnH = 55;
+                const retryX = cx - btnW - 15;
+                const menuX = cx + 15;
+
+                // 다시하기 버튼
+                if (mx >= retryX && mx <= retryX + btnW && my >= btnY && my <= btnY + btnH) {
+                    gameState.score = 0;
+                    gameState.coins = 0;
+                    gameState.coinsEarned = 0;
+                    gameState.lives = gameState.maxLives;
+                    gameState.invulnTimer = 0;
+                    gameState.currentScene = 'game';
+                    gameState.isRunning = true;
+                    gameState.isPaused = false;
+                    gameState.gameStartTime = Date.now();
+                    if (typeof engine !== 'undefined' && engine.scenes) {
+                        engine.scenes.game = null;
+                        engine.scenes.gameOver = null;
+                    }
+                }
+                // 메인메뉴 버튼
+                else if (mx >= menuX && mx <= menuX + btnW && my >= btnY && my <= btnY + btnH) {
+                    gameState.currentScene = 'title';
+                    gameState.isRunning = false;
+                    if (typeof engine !== 'undefined' && engine.scenes) {
+                        engine.scenes.game = null;
+                        engine.scenes.gameOver = null;
+                    }
+                }
+                // 버튼 밖 터치는 무시 (실수 방지)
+            }
+        }
+
+        // ============================================================================
+        // GAME ENGINE
+        // ============================================================================
+        class GameEngine {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.scenes = {
+                    title: new TitleScene(),
+                    select: new SelectScene(),
+                    game: null,
+                    gameOver: null
+                };
+                this.lastTime = 0; // rAF timestamp로 초기화됨
+                this.prevScene = 'title';
+            }
+
+            run() {
+                requestAnimationFrame((ts) => this.gameLoop(ts));
+            }
+
+            gameLoop(timestamp) {
+                if (!this.lastTime) this.lastTime = timestamp;
+                const deltaTime = Math.min((timestamp - this.lastTime), 33) / 1000;
+                this.lastTime = timestamp;
+
+                // 씬 전환 감지 → 입력 클리어
+                if (gameState.currentScene !== this.prevScene) {
+                    inputManager.lastTouchX = undefined;
+                    inputManager.lastTouchY = undefined;
+                    inputManager.jumping = false;
+                    inputManager.jumpPressed = false;
+                    this.prevScene = gameState.currentScene;
+                }
+
+                // Update
+                const inputState = inputManager.getInputState();
+
+                if (gameState.currentScene === 'title') {
+                    this.scenes.title.update(deltaTime);
+                    this.scenes.title.handleInput(inputState);
+                } else if (gameState.currentScene === 'select') {
+                    this.scenes.select.update(deltaTime);
+                    this.scenes.select.handleInput(inputState);
+                } else if (gameState.currentScene === 'game') {
+                    if (!this.scenes.game) {
+                        this.scenes.game = new GameScene();
+                    }
+                    if (gameState.isRunning) {
+                        this.scenes.game.update(inputState, deltaTime);
+                        this.scenes.game.handleInput(inputState);
+                    }
+                } else if (gameState.currentScene === 'gameOver') {
+                    if (!this.scenes.gameOver) {
+                        this.scenes.gameOver = new GameOverScene();
+                    }
+                    this.scenes.gameOver.update(deltaTime);
+                    this.scenes.gameOver.handleInput(inputState);
+                }
+
+                // Draw
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (gameState.currentScene === 'title') {
+                    this.scenes.title.draw(this.ctx);
+                } else if (gameState.currentScene === 'select') {
+                    this.scenes.select.draw(this.ctx);
+                } else if (gameState.currentScene === 'game' && this.scenes.game) {
+                    this.scenes.game.draw(this.ctx);
+                } else if (gameState.currentScene === 'gameOver' && this.scenes.gameOver) {
+                    this.scenes.gameOver.draw(this.ctx);
+                }
+
+                // 매 프레임 점프 입력 리셋 (모든 씬에서)
+                inputManager.resetJump();
+
+                this.run();
+            }
+        }
+
+        // ============================================================================
+        // MAIN INITIALIZATION
+        // ============================================================================
+        const canvas = document.getElementById('gameCanvas');
+        canvas.width = GAME_CONFIG.width;
+        canvas.height = GAME_CONFIG.height;
+
+        // 캔버스를 화면에 맞게 리사이즈
+        function resizeCanvas() {
+            const container = document.getElementById('gameContainer');
+            const containerW = container.clientWidth;
+            const containerH = container.clientHeight;
+            const scale = Math.min(containerW / GAME_CONFIG.width, containerH / GAME_CONFIG.height);
+            canvas.style.width = (GAME_CONFIG.width * scale) + 'px';
+            canvas.style.height = (GAME_CONFIG.height * scale) + 'px';
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 첫 실행 시 보너스 코인 300개 지급
+        if (!localStorage.getItem('dongramiRunInitialized')) {
+            localStorage.setItem('totalCoins', '300');
+            localStorage.removeItem('selectedCharacter');
+            localStorage.removeItem('unlockedCharacters');
+            localStorage.setItem('dongramiRunInitialized', 'true');
+            gameState.totalCoins = 300;
+            gameState.selectedCharacter = Object.keys(spriteConfig.sprites)[0];
+            gameState.unlockedCharacters = [Object.keys(spriteConfig.sprites)[0]];
+        }
+
+        const audioManager = new AudioManager();
+        const inputManager = new InputManager();
+        const engine = new GameEngine(canvas);
+
+        engine.run();
+    </script>
+</body>
+</html>

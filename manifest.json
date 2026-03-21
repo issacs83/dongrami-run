@@ -1,0 +1,19 @@
+{
+  "name": "동그라미 런 - Dongrami Run",
+  "short_name": "동그라미 런",
+  "description": "귀여운 캐릭터로 달리는 무한 러너 게임!",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#87ceeb",
+  "theme_color": "#87ceeb",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%2387ceeb'/><circle cx='256' cy='256' r='160' fill='%23FF4444'/><circle cx='220' cy='230' r='24' fill='white'/><circle cx='292' cy='230' r='24' fill='white'/><circle cx='226' cy='230' r='12' fill='black'/><circle cx='298' cy='230' r='12' fill='black'/><path d='M 220 290 Q 256 320 292 290' stroke='black' stroke-width='8' fill='none'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
