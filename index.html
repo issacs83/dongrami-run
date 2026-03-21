@@ -1146,45 +1146,83 @@
                     }
                 });
 
-                // Touch jump
+                // 모바일 세로모드 회전 시 터치 좌표 변환 헬퍼
                 const canvas = document.getElementById('gameCanvas');
+
+                this._clientToGame = (clientX, clientY) => {
+                    const isMobilePortrait = window.innerWidth <= 768 && window.innerWidth < window.innerHeight;
+                    const rect = canvas.getBoundingClientRect();
+
+                    if (isMobilePortrait) {
+                        // CSS rotate(90deg) 적용 상태:
+                        // 화면의 clientX → 게임의 Y (위에서 아래)
+                        // 화면의 clientY → 게임의 X (오른쪽에서 왼쪽, 반전)
+                        // rect는 회전 후 bounding box이므로 직접 계산
+                        const canvasDisplayW = canvas.offsetWidth;  // 게임의 가로 (= 화면 세로)
+                        const canvasDisplayH = canvas.offsetHeight; // 게임의 세로 (= 화면 가로)
+                        // 회전된 캔버스에서의 상대 위치 계산
+                        // rotate(90deg) + transform-origin: top left + margin-left: 100dvw
+                        // → 캔버스의 왼쪽 상단이 화면의 오른쪽 상단에 위치
+                        // 게임 X = 화면 아래에서 위로 = screenHeight - clientY
+                        // 게임 Y = 화면 왼쪽에서 오른쪽 = clientX
+                        const gameRelX = (window.innerHeight - clientY) / window.innerHeight * canvasDisplayW;
+                        const gameRelY = clientX / window.innerWidth * canvasDisplayH;
+                        const scaleX = GAME_CONFIG.width / canvasDisplayW;
+                        const scaleY = GAME_CONFIG.height / canvasDisplayH;
+                        return { x: gameRelX * scaleX, y: gameRelY * scaleY };
+                    } else {
+                        const scaleX = GAME_CONFIG.width / rect.width;
+                        const scaleY = GAME_CONFIG.height / rect.height;
+                        return {
+                            x: (clientX - rect.left) * scaleX,
+                            y: (clientY - rect.top) * scaleY
+                        };
+                    }
+                };
+
+                // Touch jump
                 canvas.addEventListener('touchstart', (e) => {
                     this.touchStartY = e.touches[0].clientY;
-                    // 캔버스 좌표 변환
-                    const rect = canvas.getBoundingClientRect();
-                    const scaleX = GAME_CONFIG.width / rect.width;
-                    const scaleY = GAME_CONFIG.height / rect.height;
-                    this.lastTouchX = (e.touches[0].clientX - rect.left) * scaleX;
-                    this.lastTouchY = (e.touches[0].clientY - rect.top) * scaleY;
+                    this.touchStartX = e.touches[0].clientX;
+                    const pos = this._clientToGame(e.touches[0].clientX, e.touches[0].clientY);
+                    this.lastTouchX = pos.x;
+                    this.lastTouchY = pos.y;
                     if (!this.jumpPressed) {
                         this.jumping = true;
                         this.jumpPressed = true;
                     }
                     e.preventDefault();
-                });
+                }, { passive: false });
 
                 canvas.addEventListener('touchmove', (e) => {
                     if (e.touches.length > 0) {
-                        const deltaY = e.touches[0].clientY - this.touchStartY;
-                        if (deltaY > 50) {
-                            this.ducking = true;
+                        const isMobilePortrait = window.innerWidth <= 768 && window.innerWidth < window.innerHeight;
+                        if (isMobilePortrait) {
+                            // 세로모드 회전: 화면의 X이동 = 게임의 아래로 스와이프
+                            const deltaX = e.touches[0].clientX - this.touchStartX;
+                            if (deltaX > 50) {
+                                this.ducking = true;
+                            }
+                        } else {
+                            const deltaY = e.touches[0].clientY - this.touchStartY;
+                            if (deltaY > 50) {
+                                this.ducking = true;
+                            }
                         }
                     }
-                });
+                }, { passive: true });
 
                 canvas.addEventListener('touchend', (e) => {
                     this.jumpPressed = false;
                     this.ducking = false;
                     e.preventDefault();
-                });
+                }, { passive: false });
 
                 // Mouse click for jump
                 canvas.addEventListener('click', (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    const scaleX = GAME_CONFIG.width / rect.width;
-                    const scaleY = GAME_CONFIG.height / rect.height;
-                    this.lastTouchX = (e.clientX - rect.left) * scaleX;
-                    this.lastTouchY = (e.clientY - rect.top) * scaleY;
+                    const pos = this._clientToGame(e.clientX, e.clientY);
+                    this.lastTouchX = pos.x;
+                    this.lastTouchY = pos.y;
                     if (!this.jumpPressed) {
                         this.jumping = true;
                         this.jumpPressed = true;
