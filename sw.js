@@ -1,21 +1,23 @@
-// 동그라미 런 Service Worker v3.5.0
-const CACHE_NAME = 'dongrami-run-v3.5.0';
+// 동그라미 런 Service Worker v3.7.0
+const CACHE_VERSION = 'v3.7.0';
+const CACHE_NAME = 'dongrami-run-' + CACHE_VERSION;
 const ASSETS = [
     '/dongrami-run/',
     '/dongrami-run/index.html',
-    '/dongrami-run/manifest.json'
+    '/dongrami-run/manifest.json',
+    '/dongrami-run/og-image.png'
 ];
 
-// 설치 시 핵심 파일 캐시
+// 설치 시 핵심 파일 캐시 + 즉시 활성화
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(ASSETS))
-            .then(() => self.skipWaiting())
+            .then(() => self.skipWaiting()) // 대기 없이 즉시 활성화
     );
 });
 
-// 활성화 시 이전 버전 캐시 삭제
+// 활성화 시 이전 버전 캐시 모두 삭제 + 즉시 제어권 획득
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(keys =>
@@ -23,35 +25,44 @@ self.addEventListener('activate', event => {
                 keys.filter(key => key !== CACHE_NAME)
                     .map(key => caches.delete(key))
             )
-        ).then(() => self.clients.claim())
+        ).then(() => self.clients.claim()) // 모든 탭 즉시 제어
     );
 });
 
-// Network First 전략: 네트워크 우선, 실패 시 캐시
+// Network First: 항상 서버에서 최신 버전 가져오기, 실패 시에만 캐시
 self.addEventListener('fetch', event => {
-    // 같은 origin 요청만 처리
     if (!event.request.url.startsWith(self.location.origin)) return;
-
+    // navigation 요청 (HTML 페이지)은 항상 네트워크 우선
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+    // 기타 리소스도 네트워크 우선
     event.respondWith(
         fetch(event.request)
             .then(response => {
-                // 성공하면 캐시 업데이트
                 const clone = response.clone();
-                caches.open(CACHE_NAME).then(cache => {
-                    cache.put(event.request, clone);
-                });
+                caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
                 return response;
             })
-            .catch(() => {
-                // 오프라인이면 캐시에서 제공
-                return caches.match(event.request);
-            })
+            .catch(() => caches.match(event.request))
     );
 });
 
-// 새 버전 감지 시 클라이언트에 메시지 전송
+// 메시지 처리
 self.addEventListener('message', event => {
     if (event.data === 'skipWaiting') {
         self.skipWaiting();
+    }
+    if (event.data === 'getVersion') {
+        event.ports[0].postMessage(CACHE_VERSION);
     }
 });

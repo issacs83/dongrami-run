@@ -18,7 +18,9 @@
     <meta property="og:title" content="동그라미 런 🏃‍♂️">
     <meta property="og:description" content="귀여운 캐릭터로 달리는 무한 러너 게임! 친구랑 점수 대결하자!">
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://issacs83.github.io/dongrami-run/">
     <meta property="og:image" content="https://issacs83.github.io/dongrami-run/og-image.png">
+    <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <!-- Twitter Card -->
@@ -768,6 +770,41 @@
         };
 
         // ============================================================================
+        // CHARACTER ABILITIES - 캐릭터별 고유 능력
+        // ============================================================================
+        const CHARACTER_ABILITIES = {
+            '동그라미': { name: '기본', desc: '능력 없음', type: 'none' },
+            '네모미': { name: '철벽 방어', desc: '쉴드로 시작', type: 'startShield' },
+            '별미': { name: '스타 점프', desc: '더블점프 시 코인+1', type: 'doubleJumpCoin' },
+            '삼각미': { name: '단단한 몸', desc: '3회 피격 무시', type: 'hitIgnore', charges: 3 },
+            '하트미': { name: '봄의 축복', desc: '봄에 1초마다 코인+1', type: 'springCoin' },
+            '김여름': { name: '여름의 열기', desc: '여름 코인자동+코인3배', type: 'summerCoin', coinMulti: 3 },
+            '동그라미하준': { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
+            '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
+        };
+
+        // 코인 추가 헬퍼 함수 (캐릭터 코인 배수 적용)
+        function addCoins(amount) {
+            const ability = CHARACTER_ABILITIES[gameState.selectedCharacter];
+            let multiplier = 1;
+            if (ability?.coinMulti) {
+                if (ability.type === 'coinMultiplier') {
+                    multiplier = ability.coinMulti; // 골든동그라미: 항상 2배
+                } else if (ability.type === 'summerCoin') {
+                    const season = getCurrentSeason(gameState.score || 0);
+                    if (season === 'summer') multiplier = ability.coinMulti; // 김여름: 여름에만 3배
+                } else if (ability.type === 'autumnWinterCoin') {
+                    const season = getCurrentSeason(gameState.score || 0);
+                    if (season === 'autumn' || season === 'winter') multiplier = ability.coinMulti; // 하준: 가을/겨울에만 5배
+                }
+            }
+            const final = Math.ceil(amount * multiplier);
+            gameState.coins += final;
+            gameState.coinsEarned += final;
+            return final;
+        }
+
+        // ============================================================================
         // AUDIO MANAGER
         // ============================================================================
         class AudioManager {
@@ -1374,9 +1411,14 @@
                     this.doubleJumpAvailable = true;
                     audioManager.playJumpSound();
                 } else if (inputState.jumping && this.doubleJumpAvailable && this.isJumping) {
-                    this.velocityY = GAME_CONFIG.jumpPower;
+                    this.velocityY = GAME_CONFIG.jumpPower * jumpBoost;
                     this.doubleJumpAvailable = false;
                     audioManager.playJumpSound();
+                    // 별미 능력: 더블점프 시 코인+1
+                    if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'doubleJumpCoin') {
+                        gameState.coins += 1;
+                        gameState.coinsEarned += 1;
+                    }
                 }
 
                 // Duck
@@ -2764,7 +2806,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.5.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.7.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -2791,6 +2833,15 @@
                     gameState.isRunning = true;
                     gameState.isPaused = false;
                     gameState.gameStartTime = Date.now();
+                    // 캐릭터 능력 상태 초기화
+                    gameState.abilityState = {};
+                    const ability = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                    if (ability) {
+                        if (ability.type === 'hitIgnore') gameState.abilityState.hitIgnoreLeft = ability.charges;
+                        if (ability.type === 'springCoin') gameState.abilityState.springCoinTimer = 0;
+                        if (ability.type === 'summerCoin') gameState.abilityState.seasonCoinTimer = 0;
+                        if (ability.type === 'autumnWinterCoin') gameState.abilityState.seasonCoinTimer = 0;
+                    }
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
                         engine.scenes.gameOver = null;
@@ -3063,6 +3114,24 @@
                     ctx.fillText(this.message, GAME_CONFIG.width/2, GAME_CONFIG.height - 100);
                 }
 
+                // 선택된 캐릭터 능력 표시
+                const selectedAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                if (selectedAbility && selectedAbility.type !== 'none') {
+                    ctx.fillStyle = 'rgba(255,102,0,0.1)';
+                    ctx.beginPath();
+                    ctx.roundRect(GAME_CONFIG.width/2 - 180, GAME_CONFIG.height - 115, 360, 35, 8);
+                    ctx.fill();
+                    ctx.strokeStyle = '#FF8800';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#FF6600';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`⚡ ${selectedAbility.name}: ${selectedAbility.desc}`, GAME_CONFIG.width/2, GAME_CONFIG.height - 97);
+                    ctx.textAlign = 'left';
+                }
+
                 // 뒤로가기 버튼
                 ctx.fillStyle = '#666';
                 ctx.beginPath();
@@ -3070,7 +3139,9 @@
                 ctx.fill();
                 ctx.fillStyle = '#FFF';
                 ctx.font = 'bold 22px Arial';
+                ctx.textAlign = 'center';
                 ctx.fillText('← 돌아가기', GAME_CONFIG.width/2, GAME_CONFIG.height - 42);
+                ctx.textAlign = 'left';
 
                 ctx.restore();
             }
@@ -3157,6 +3228,11 @@
                         seasonalBGM.start('spring');
                     }
                 }
+                // 네모미 능력: 쉴드로 시작
+                if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'startShield') {
+                    this.player.activePowerUp = 'shield';
+                    this.player.powerUpTimer = 999; // 한번 맞을 때까지 유지
+                }
             }
 
             update(inputState, deltaTime) {
@@ -3184,6 +3260,43 @@
                     // speedLevel은 매 프레임 자동 계산됨 (winterCount / 5)
                 }
                 this.prevSeasonForWinter = rawSeason;
+
+                // 캐릭터 능력 업데이트
+                // 하트미 능력: 봄 시즌에 1초마다 코인+1
+                if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'springCoin') {
+                    if (rawSeason === 'spring') {
+                        gameState.abilityState.springCoinTimer = (gameState.abilityState.springCoinTimer || 0) + deltaTime;
+                        if (gameState.abilityState.springCoinTimer >= 1.0) {
+                            gameState.abilityState.springCoinTimer -= 1.0;
+                            gameState.coins += 1;
+                            gameState.coinsEarned += 1;
+                        }
+                    }
+                }
+
+                // 김여름 능력: 여름에 1초마다 코인 자동획득
+                if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'summerCoin') {
+                    if (rawSeason === 'summer') {
+                        gameState.abilityState.seasonCoinTimer = (gameState.abilityState.seasonCoinTimer || 0) + deltaTime;
+                        if (gameState.abilityState.seasonCoinTimer >= 1.0) {
+                            gameState.abilityState.seasonCoinTimer -= 1.0;
+                            gameState.coins += 1;
+                            gameState.coinsEarned += 1;
+                        }
+                    }
+                }
+
+                // 동그라미하준 능력: 가을/겨울에 1초마다 코인 자동획득
+                if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'autumnWinterCoin') {
+                    if (rawSeason === 'autumn' || rawSeason === 'winter') {
+                        gameState.abilityState.seasonCoinTimer = (gameState.abilityState.seasonCoinTimer || 0) + deltaTime;
+                        if (gameState.abilityState.seasonCoinTimer >= 1.0) {
+                            gameState.abilityState.seasonCoinTimer -= 1.0;
+                            gameState.coins += 1;
+                            gameState.coinsEarned += 1;
+                        }
+                    }
+                }
 
                 // BGM 업데이트
                 if (typeof seasonalBGM !== 'undefined') {
@@ -3376,6 +3489,16 @@
                             this.obstacles = this.obstacles.filter(o => o !== obstacle);
                             this.player.activePowerUp = null;
                         } else if (gameState.invulnTimer <= 0) {
+                            // 삼각미 능력: 피격 무시 (3회)
+                            if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'hitIgnore' &&
+                                gameState.abilityState.hitIgnoreLeft > 0) {
+                                gameState.abilityState.hitIgnoreLeft--;
+                                gameState.invulnTimer = 1.0; // 짧은 무적
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#4CAF50', 15);
+                                this.obstacles = this.obstacles.filter(o => o !== obstacle);
+                                return; // 데미지 무시
+                            }
+
                             // 악당은 목숨 2개, 일반 장애물은 1개
                             const isVillain = obstacle.type.startsWith('villain-');
                             const damage = isVillain ? 2 : 1;
@@ -3406,8 +3529,7 @@
                 // Check coin collisions
                 this.coins.forEach(coin => {
                     if (this.checkAABBCollision(playerHitbox, coin.getHitbox())) {
-                        gameState.coins++;
-                        gameState.coinsEarned++;
+                        addCoins(1);
                         this.particles.createExplosion(coin.x, coin.y, '#FFD700', 6);
                         this.coins = this.coins.filter(c => c !== coin);
                         audioManager.playCoinSound();
@@ -3482,6 +3604,48 @@
                 for (let i = 0; i < gameState.maxLives; i++) {
                     ctx.fillStyle = i < gameState.lives ? '#FF0000' : '#555555';
                     ctx.fillText(i < gameState.lives ? '❤️' : '🖤', 20 + i * 35, 100);
+                }
+
+                // 캐릭터 능력 HUD 표시
+                const abilityType = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
+                if (abilityType === 'hitIgnore' && gameState.abilityState.hitIgnoreLeft > 0) {
+                    ctx.fillStyle = '#4CAF50';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`🛡️ 무시 ${gameState.abilityState.hitIgnoreLeft}회`, 15, 135);
+                }
+                if (abilityType === 'summerCoin') {
+                    const rawSeason = getCurrentSeason(gameState.score || 0);
+                    if (rawSeason === 'summer') {
+                        ctx.fillStyle = '#FF6600';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.fillText('☀️ 여름 코인3배 활성!', 15, 135);
+                    }
+                }
+                if (abilityType === 'autumnWinterCoin') {
+                    const rawSeason = getCurrentSeason(gameState.score || 0);
+                    if (rawSeason === 'autumn' || rawSeason === 'winter') {
+                        ctx.fillStyle = '#8B4513';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(`${rawSeason === 'autumn' ? '🍂' : '❄️'} 코인5배 활성!`, 15, 135);
+                    }
+                }
+                if (abilityType === 'springCoin') {
+                    const rawSeason = getCurrentSeason(gameState.score || 0);
+                    if (rawSeason === 'spring') {
+                        ctx.fillStyle = '#FF69B4';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.fillText('🌸 봄 코인 활성!', 15, 135);
+                    }
+                }
+                if (abilityType === 'coinMultiplier') {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('✨ 코인 2배!', 15, 135);
                 }
 
                 // 피격 빨간 번쩍 이펙트
@@ -3853,6 +4017,15 @@
                     gameState.isRunning = true;
                     gameState.isPaused = false;
                     gameState.gameStartTime = Date.now();
+                    // 캐릭터 능력 상태 초기화
+                    gameState.abilityState = {};
+                    const ability2 = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                    if (ability2) {
+                        if (ability2.type === 'hitIgnore') gameState.abilityState.hitIgnoreLeft = ability2.charges;
+                        if (ability2.type === 'springCoin') gameState.abilityState.springCoinTimer = 0;
+                        if (ability2.type === 'summerCoin') gameState.abilityState.seasonCoinTimer = 0;
+                        if (ability2.type === 'autumnWinterCoin') gameState.abilityState.seasonCoinTimer = 0;
+                    }
                     if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
@@ -4280,24 +4453,47 @@
 
         engine.run();
 
-        // Service Worker 등록 + 업데이트 알림
+        // Service Worker 등록 + 강제 업데이트 체크
+        const GAME_VERSION = 'v3.7.0';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
+                // PWA 실행 시 즉시 업데이트 체크
+                reg.update();
+                // 30초마다 업데이트 체크 (PWA 홈 아이콘 실행 대응)
+                setInterval(() => reg.update(), 30000);
+
                 // 새 버전 감지
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
                     newWorker.addEventListener('statechange', () => {
-                        if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
-                            // 업데이트 배너 표시
-                            const banner = document.createElement('div');
-                            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;text-align:center;font-size:16px;font-weight:bold;z-index:99999;cursor:pointer;font-family:sans-serif;';
-                            banner.textContent = '🎮 새 버전이 있어요! 터치하여 업데이트';
-                            banner.onclick = () => location.reload();
-                            document.body.appendChild(banner);
+                        if (newWorker.state === 'installed') {
+                            if (navigator.serviceWorker.controller) {
+                                // 업데이트 배너 표시
+                                showUpdateBanner();
+                            }
                         }
                     });
                 });
+
+                // 컨트롤러 변경 시 자동 새로고침
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        refreshing = true;
+                        location.reload();
+                    }
+                });
             }).catch(err => console.log('SW 등록 실패:', err));
+        }
+
+        function showUpdateBanner() {
+            const banner = document.createElement('div');
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;text-align:center;font-size:18px;font-weight:bold;z-index:99999;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+            banner.innerHTML = '🎮 새 버전이 있어요! 터치하여 업데이트';
+            banner.onclick = () => {
+                navigator.serviceWorker.controller.postMessage('skipWaiting');
+            };
+            document.body.appendChild(banner);
         }
     </script>
 </body>
