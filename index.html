@@ -405,93 +405,91 @@
                     },
                     cost: 500,
                     hitbox: { offsetX: 10, offsetY: 10, width: 44, height: 44 }
-                },
-
-                김여름: {
-                    name: '김여름',
-                    colors: { main: '#FFD700', secondary: '#FF8C00' },
-                    size: 64,
-                    hidden: true, // 히든 캐릭터
-                    drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
-                        ctx.save();
-                        ctx.translate(x + 32, y + 32);
-                        const glow = 1 + Math.sin(frameIndex * 0.15) * 0.08;
-                        ctx.scale(glow, glow);
-
-                        // 태양 광선 (8개, 회전)
-                        const rayAngle = frameIndex * 0.03;
-                        ctx.fillStyle = '#FFD700';
-                        for (let i = 0; i < 8; i++) {
-                            const angle = rayAngle + (i * Math.PI / 4);
-                            ctx.save();
-                            ctx.rotate(angle);
-                            ctx.beginPath();
-                            ctx.moveTo(-5, -20);
-                            ctx.lineTo(0, -32);
-                            ctx.lineTo(5, -20);
-                            ctx.closePath();
-                            ctx.fill();
-                            ctx.restore();
-                        }
-
-                        // 태양 본체 (그라데이션)
-                        const sunGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 22);
-                        sunGrad.addColorStop(0, '#FFEE44');
-                        sunGrad.addColorStop(0.6, '#FFD700');
-                        sunGrad.addColorStop(1, '#FF8C00');
-                        ctx.fillStyle = sunGrad;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, 22, 0, Math.PI * 2);
-                        ctx.fill();
-
-                        // 태양 테두리
-                        ctx.strokeStyle = '#FF6600';
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
-
-                        // 선글라스 (쿨한 히든 캐릭터)
-                        ctx.fillStyle = '#222222';
-                        ctx.beginPath();
-                        ctx.roundRect(-16, -10, 12, 8, 2);
-                        ctx.fill();
-                        ctx.beginPath();
-                        ctx.roundRect(4, -10, 12, 8, 2);
-                        ctx.fill();
-                        // 선글라스 다리
-                        ctx.strokeStyle = '#222222';
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.moveTo(-4, -6);
-                        ctx.lineTo(4, -6);
-                        ctx.stroke();
-
-                        // 자신감 넘치는 미소
-                        ctx.strokeStyle = '#CC4400';
-                        ctx.lineWidth = 2.5;
-                        ctx.beginPath();
-                        ctx.arc(0, 4, 8, 0.1, Math.PI - 0.1, false);
-                        ctx.stroke();
-
-                        // 점프 시 불꽃 이펙트
-                        if (isJumping) {
-                            ctx.fillStyle = 'rgba(255,100,0,0.6)';
-                            for (let i = 0; i < 5; i++) {
-                                const fa = (frameIndex * 0.1 + i * 1.2);
-                                const fx = Math.cos(fa) * 28;
-                                const fy = Math.sin(fa) * 28;
-                                ctx.beginPath();
-                                ctx.arc(fx, fy, 3, 0, Math.PI * 2);
-                                ctx.fill();
-                            }
-                        }
-
-                        ctx.restore();
-                    },
-                    cost: 1000,
-                    hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
                 }
             }
         };
+
+        // 김여름 캐릭터를 별미 뒤(4번째)에 삽입 — 순서: 동그라미, 네모미, 별미, 김여름, 삼각미, 하트미
+        (function insertKimYeoreum() {
+            const kimData = {
+                name: '김여름',
+                colors: { main: '#FFD700', secondary: '#FF8C00' },
+                size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save();
+                    ctx.translate(x + 32, y + 32);
+                    const glow = 1 + Math.sin(frameIndex * 0.15) * 0.08;
+                    ctx.scale(glow, glow);
+                    const rayAngle = frameIndex * 0.03;
+                    ctx.fillStyle = '#FFD700';
+                    for (let i = 0; i < 8; i++) {
+                        const angle = rayAngle + (i * Math.PI / 4);
+                        ctx.save();
+                        ctx.rotate(angle);
+                        ctx.beginPath();
+                        ctx.moveTo(-5, -20);
+                        ctx.lineTo(0, -32);
+                        ctx.lineTo(5, -20);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                    const sunGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 22);
+                    sunGrad.addColorStop(0, '#FFEE44');
+                    sunGrad.addColorStop(0.6, '#FFD700');
+                    sunGrad.addColorStop(1, '#FF8C00');
+                    ctx.fillStyle = sunGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#FF6600';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.fillStyle = '#222222';
+                    ctx.beginPath();
+                    ctx.roundRect(-16, -10, 12, 8, 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.roundRect(4, -10, 12, 8, 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#222222';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(-4, -6);
+                    ctx.lineTo(4, -6);
+                    ctx.stroke();
+                    ctx.strokeStyle = '#CC4400';
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.arc(0, 4, 8, 0.1, Math.PI - 0.1, false);
+                    ctx.stroke();
+                    if (isJumping) {
+                        ctx.fillStyle = 'rgba(255,100,0,0.6)';
+                        for (let i = 0; i < 5; i++) {
+                            const fa = (frameIndex * 0.1 + i * 1.2);
+                            const fx = Math.cos(fa) * 28;
+                            const fy = Math.sin(fa) * 28;
+                            ctx.beginPath();
+                            ctx.arc(fx, fy, 3, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                    ctx.restore();
+                },
+                cost: 1000,
+                hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+            // 별미 뒤에 삽입하기 위해 순서 재구성
+            const oldSprites = spriteConfig.sprites;
+            const newSprites = {};
+            for (const key of Object.keys(oldSprites)) {
+                newSprites[key] = oldSprites[key];
+                if (key === '별미') {
+                    newSprites['김여름'] = kimData;
+                }
+            }
+            spriteConfig.sprites = newSprites;
+        })();
 
         // ============================================================================
         // GAME STATE
@@ -2186,7 +2184,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v2.0.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v2.0.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -2268,10 +2266,10 @@
                 ctx.font = 'bold 24px Arial';
                 ctx.fillText(`보유 동전: ${gameState.totalCoins}`, GAME_CONFIG.width/2, 100);
 
-                // 캐릭터 그리드 (5개)
+                // 캐릭터 그리드 (6개까지 지원)
                 const keys = Object.keys(spriteConfig.sprites);
-                const cols = Math.min(keys.length, 5);
-                const cellW = 150;
+                const cols = Math.min(keys.length, 6);
+                const cellW = Math.min(150, (GAME_CONFIG.width - 100) / cols);
                 const cellH = 180;
                 const startX = GAME_CONFIG.width/2 - (cols * cellW) / 2;
                 const startY = 130;
@@ -2377,8 +2375,8 @@
 
                 // 캐릭터 카드 클릭 판정
                 const keys = Object.keys(spriteConfig.sprites);
-                const cols = Math.min(keys.length, 5);
-                const cellW = 150;
+                const cols = Math.min(keys.length, 6);
+                const cellW = Math.min(150, (GAME_CONFIG.width - 100) / cols);
                 const cellH = 180;
                 const startX = GAME_CONFIG.width/2 - (cols * cellW) / 2;
                 const startY = 130;
@@ -2429,9 +2427,14 @@
                 this.seasonBanner = null; // { text, timer }
                 this.lastSeason = 'spring';
                 this.prevSeasonForWinter = 'spring'; // 겨울→봄 전환 감지용
-                // BGM 시작
+                // BGM 시작 (AudioContext resume 보장)
                 if (typeof seasonalBGM !== 'undefined') {
-                    seasonalBGM.start('spring');
+                    const ac = audioManager.audioContext;
+                    if (ac && ac.state === 'suspended') {
+                        ac.resume().then(() => seasonalBGM.start('spring'));
+                    } else {
+                        seasonalBGM.start('spring');
+                    }
                 }
             }
 
@@ -2453,11 +2456,11 @@
                     }
                 }
 
-                // 겨울 → 봄 전환 감지: 겨울을 완전히 지남 = 레벨 0.5 증가
+                // 겨울 → 봄 전환 감지: 4계절(봄→여름→가을→겨울) 완전 순환 = 레벨 0.5 증가 (최대 100)
                 const rawSeason = getCurrentSeason(gameState.score || 0);
                 if (this.prevSeasonForWinter === 'winter' && rawSeason === 'spring') {
                     gameState.winterCount++;
-                    gameState.seasonLevel = gameState.winterCount * 0.5;
+                    gameState.seasonLevel = Math.min(100, gameState.winterCount * 0.5);
                 }
                 this.prevSeasonForWinter = rawSeason;
 
@@ -2470,7 +2473,8 @@
                 this.particles.update(deltaTime);
 
                 // Update speed & level (0~100) + 계절 레벨 보너스 적용
-                const seasonSpeedBonus = gameState.seasonLevel * 15; // 겨울 1회 통과마다 속도 +7.5
+                // seasonLevel은 0~100 범위, 속도 보너스는 미미하게 (순환할수록 살짝 빨라짐)
+                const seasonSpeedBonus = gameState.seasonLevel * 0.3;
                 gameState.gameSpeed = Math.min(
                     GAME_CONFIG.maxSpeed,
                     GAME_CONFIG.initialSpeed + gameState.score * GAME_CONFIG.speedIncrease + seasonSpeedBonus
@@ -3120,19 +3124,16 @@
         const inputManager = new InputManager();
         const engine = new GameEngine(canvas);
 
-        // AudioContext 활성화 (사용자 인터랙션 필요)
-        document.addEventListener('touchstart', function resumeAudio() {
+        // AudioContext 활성화 (iOS/Safari에서는 사용자 인터랙션 후에만 재생 가능)
+        function tryResumeAudio() {
             if (audioManager.audioContext && audioManager.audioContext.state === 'suspended') {
                 audioManager.audioContext.resume();
             }
-            document.removeEventListener('touchstart', resumeAudio);
-        }, { once: true });
-        document.addEventListener('click', function resumeAudio() {
-            if (audioManager.audioContext && audioManager.audioContext.state === 'suspended') {
-                audioManager.audioContext.resume();
-            }
-            document.removeEventListener('click', resumeAudio);
-        }, { once: true });
+        }
+        // 다양한 인터랙션 이벤트에서 resume 시도
+        ['touchstart', 'touchend', 'click', 'keydown', 'mousedown'].forEach(evt => {
+            document.addEventListener(evt, tryResumeAudio, { passive: true });
+        });
 
         engine.run();
     </script>
