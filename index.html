@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.9.3';
+        var CURRENT_VER = 'v3.9.4';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -3092,7 +3092,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.9.3', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.9.4', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3798,10 +3798,20 @@
                 }
 
                 // Spawn obstacles (deltaTime 기반 — 끊김 방지)
+                // 난이도: 계절 순환(winterCount)이 많을수록 장애물 스폰 간격 줄어듦
                 this.obstacleTimer -= deltaTime;
                 if (this.obstacleTimer <= 0) {
                     this.spawnObstacle();
-                    this.obstacleTimer = 2.5 + Math.random() * 2.5;
+                    // 기본 2.5~5.0초 → winterCount마다 점점 빨라짐 (최소 0.8~1.6초)
+                    const wc = gameState.winterCount || 0;
+                    const spawnReduction = Math.min(1.7, wc * 0.08); // 최대 1.7초 감소
+                    const baseMin = Math.max(0.8, 2.5 - spawnReduction);
+                    const baseRange = Math.max(0.8, 2.5 - spawnReduction * 0.7);
+                    this.obstacleTimer = baseMin + Math.random() * baseRange;
+                    // 높은 순환: 가끔 연속 2개 장애물 동시 스폰
+                    if (wc >= 10 && Math.random() < Math.min(0.3, wc * 0.02)) {
+                        setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
+                    }
                 }
 
                 // Spawn coins (가끔 2~3개 묶음으로 등장)
@@ -3852,24 +3862,30 @@
                 // Collision detection
                 this.checkCollisions(deltaTime);
 
-                // Score increment (초당 ~10점)
-                gameState.score += deltaTime * 10;
+                // Score increment (초당 ~10점 + 순환마다 약간 증가)
+                const scoreBoost = 1 + (gameState.winterCount || 0) * 0.05; // 순환마다 5% 증가
+                gameState.score += deltaTime * 10 * scoreBoost;
             }
 
             spawnObstacle() {
                 const score = gameState.score;
                 const season = getCurrentSeason(score);
                 const level = gameState.speedLevel || 0;
+                const wc = gameState.winterCount || 0;
                 let pool;
 
-                if (score < 30) {
+                // 난이도 보정: 계절 순환이 많으면 점수 기준을 낮춰서 어려운 장애물이 더 일찍 등장
+                const difficultyBonus = wc * 15; // 순환마다 15점 보정
+                const effectiveScore = score + difficultyBonus;
+
+                if (effectiveScore < 30) {
                     // 초반: 작은 장애물만
                     pool = ['cactus-small', 'rock-small', 'mushroom'];
-                } else if (score < 70) {
+                } else if (effectiveScore < 70) {
                     // 중반 초기: 기본 + 계절별
                     const base = ['cactus-small', 'cactus-medium', 'rock-small', 'stump', 'bird-low'];
                     pool = this._addSeasonObstacles(base, season);
-                } else if (score < 150) {
+                } else if (effectiveScore < 150) {
                     // 중반: 다양한 장애물
                     const base = ['cactus-small', 'cactus-medium', 'cactus-large', 'rock-small', 'rock-large',
                                   'bird-low', 'bird-mid', 'stump', 'bee', 'puddle'];
@@ -3890,18 +3906,21 @@
 
             _addVillains(pool, level) {
                 const result = [...pool];
+                // 계절 순환 횟수에 따른 악당 가중치 배수 (순환 많을수록 악당 더 많이)
+                const wc = gameState.winterCount || 0;
+                const villainWeight = Math.min(5, 1 + Math.floor(wc / 5)); // 1~5배
                 // LV.0~ : 삐뚤이 (보라 슬라임) — 항상 등장 가능
-                if (level >= 0) result.push('villain-slime', 'villain-slime');
+                if (level >= 0) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-slime');
                 // LV.3~ : 까미 (검은 고양이)
-                if (level >= 3) result.push('villain-cat', 'villain-cat');
+                if (level >= 3) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-cat');
                 // LV.8~ : 불꽃이 (공중 화염)
-                if (level >= 8) result.push('villain-flame', 'villain-flame');
+                if (level >= 8) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-flame');
                 // LV.15~ : 가시왕 (거대 가시 몬스터)
-                if (level >= 15) result.push('villain-spike');
+                if (level >= 15) for (let v = 0; v < villainWeight; v++) result.push('villain-spike');
                 // LV.30~ : 유령이 (투명 유령)
-                if (level >= 30) result.push('villain-ghost', 'villain-ghost');
+                if (level >= 30) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-ghost');
                 // LV.50~ : 다크동 (보스급 — 동그라미 어둠 버전)
-                if (level >= 50) result.push('villain-dark');
+                if (level >= 50) for (let v = 0; v < villainWeight; v++) result.push('villain-dark');
                 return result;
             }
 
@@ -4062,6 +4081,16 @@
                     ctx.font = 'bold 16px Arial';
                     ctx.fillStyle = '#4488CC';
                     ctx.fillText(`❄️${gameState.winterCount}/${nextLvAt}`, 370, 24);
+                    // 난이도 표시 (순환 5회마다 단계 증가)
+                    const diffStage = Math.floor(gameState.winterCount / 5);
+                    if (diffStage >= 1) {
+                        const diffColors = ['#FF8800', '#FF4400', '#FF0000', '#CC00FF', '#880088'];
+                        const diffNames = ['어려움', '매우어려움', '극한', '지옥', '???'];
+                        const idx = Math.min(diffStage - 1, diffColors.length - 1);
+                        ctx.fillStyle = diffColors[idx];
+                        ctx.font = 'bold 13px Arial';
+                        ctx.fillText(`🔥${diffNames[idx]}`, 440, 26);
+                    }
                 }
 
                 ctx.fillStyle = '#000000';
@@ -5062,7 +5091,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.9.3';
+        const GAME_VERSION = 'v3.9.4';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
