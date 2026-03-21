@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.9.7';
+        var CURRENT_VER = 'v3.9.8';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1854,9 +1854,12 @@
                 this.frameIndex += 0.1;
                 this.moveTimer += deltaTime || 0.016;
 
-                // ★ 매 순환마다 악당 속도 대폭 증가
+                // 악당 속도 강화: 순환 + 500점 극악 보너스
                 const wc = gameState.winterCount || 0;
-                const hellBoost = 1 + wc * 0.2; // 순환마다 20% 속도 증가! (순환1=1.2, 순환2=1.4, 순환3=1.6 ...)
+                const sc = gameState.score || 0;
+                let hellBoost = 1 + wc * 0.2;
+                // ★ 500점부터 추가 속도 폭증
+                if (sc >= 500) hellBoost += 0.5 + (sc - 500) * 0.003; // 500=+0.5, 700=+1.1, 1000=+2.0
                 const sp = gameSpeed * hellBoost;
 
                 switch(this.type) {
@@ -3101,7 +3104,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.9.7', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.9.8', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3685,6 +3688,8 @@
                 this.fartEffectTimer = 0;
                 this.fartEffectX = 0;
                 this.fartEffectY = 0;
+                // 극악 모드 배너
+                this.furyModeTriggered = false;
             }
 
             update(inputState, deltaTime) {
@@ -3798,17 +3803,23 @@
                 const t = gameState.speedLevel / 100; // 0~1
                 // 기본 속도 (레벨 기반)
                 const baseSpeed = GAME_CONFIG.initialSpeed + (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed) * Math.pow(t, 2.5);
-                // ★ 핵심: 매 순환마다 게임 속도 직접 +0.8 증가
-                // 순환0=4.5, 순환1=5.3, 순환2=6.1, 순환3=6.9, 순환4=7.7, 순환5=8.5 ...
+                // 순환 보너스
                 const cycleSpeedBonus = (gameState.winterCount || 0) * 0.8;
-                gameState.gameSpeed = Math.min(
-                    GAME_CONFIG.maxSpeed * 1.5, // 최대 18까지 허용 (기존 12)
-                    baseSpeed + cycleSpeedBonus
-                );
+                let finalSpeed = baseSpeed + cycleSpeedBonus;
+
+                // ★★★ 500점 극악 모드: 점수에 비례하여 속도 급상승 ★★★
+                const currentScore = gameState.score || 0;
+                if (currentScore >= 500) {
+                    // 500점 이후 100점마다 속도 +1.0 추가 (500=+1, 600=+2, 700=+3 ...)
+                    const overScore = currentScore - 500;
+                    finalSpeed += 1.0 + overScore * 0.01; // 기본 +1 + 100점당 +1 추가
+                }
+
+                gameState.gameSpeed = Math.min(20, finalSpeed); // 최대 20
                 // 천사 능력: 속도 부스트 (15% 빠르게)
                 const angelAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
                 if (angelAbility?.type === 'angelBlessing' && angelAbility.speedBoost) {
-                    gameState.gameSpeed = Math.min(GAME_CONFIG.maxSpeed * 1.6, gameState.gameSpeed * angelAbility.speedBoost);
+                    gameState.gameSpeed = Math.min(22, gameState.gameSpeed * angelAbility.speedBoost);
                 }
 
                 // LV.100 도달 → 엔딩 씬으로 전환!
@@ -3819,26 +3830,37 @@
                     if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                 }
 
-                // Spawn obstacles (deltaTime 기반 — 끊김 방지)
-                // ★ 핵심 난이도: 매 계절 순환(winterCount)마다 확 어려워짐
+                // Spawn obstacles
                 this.obstacleTimer -= deltaTime;
                 if (this.obstacleTimer <= 0) {
                     this.spawnObstacle();
                     const wc = gameState.winterCount || 0;
+                    const sc = gameState.score || 0;
 
-                    // ★ 스폰 간격: 매 순환마다 확 줄어듦
-                    // 순환0=2.0~3.5초, 순환1=1.3~2.0초, 순환2=0.8~1.3초, 순환3=0.5~0.8초
-                    const baseMin = Math.max(0.25, 2.0 - wc * 0.5);
-                    const baseRange = Math.max(0.25, 1.5 - wc * 0.35);
-                    this.obstacleTimer = baseMin + Math.random() * baseRange;
-
-                    // 순환 1회부터: 연속 2개 동시 스폰 (확률 증가)
-                    if (wc >= 1 && Math.random() < Math.min(0.5, wc * 0.15)) {
-                        setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 150);
-                    }
-                    // 순환 3회부터: 3개 연속 스폰
-                    if (wc >= 3 && Math.random() < Math.min(0.35, (wc - 2) * 0.1)) {
-                        setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 300);
+                    if (sc >= 500) {
+                        // ★★★ 500점 극악 모드: 장애물 폭풍 ★★★
+                        // 500점=0.5~0.8초, 700점=0.3~0.5초, 1000점=0.2~0.3초
+                        const fury = Math.min(3, (sc - 500) / 200); // 0~3 단계
+                        const spMin = Math.max(0.15, 0.5 - fury * 0.12);
+                        const spRange = Math.max(0.1, 0.3 - fury * 0.07);
+                        this.obstacleTimer = spMin + Math.random() * spRange;
+                        // 60% 확률 동시 2개
+                        if (Math.random() < 0.6) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 120);
+                        }
+                        // 30% 확률 3개
+                        if (Math.random() < 0.3) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 250);
+                        }
+                    } else {
+                        // 일반 모드: 순환 기반 난이도
+                        const baseMin = Math.max(0.4, 2.0 - wc * 0.5 - sc * 0.002);
+                        const baseRange = Math.max(0.3, 1.5 - wc * 0.35 - sc * 0.001);
+                        this.obstacleTimer = baseMin + Math.random() * baseRange;
+                        // 동시 스폰
+                        if (wc >= 1 && Math.random() < Math.min(0.5, wc * 0.15)) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 150);
+                        }
                     }
                 }
 
@@ -3890,6 +3912,12 @@
                 // Collision detection
                 this.checkCollisions(deltaTime);
 
+                // 500점 극악 모드 진입 감지
+                if (!this.furyModeTriggered && (gameState.score || 0) >= 500) {
+                    this.furyModeTriggered = true;
+                    this.diffUpBanner = { text: '💀 극악 모드 돌입!! 💀', timer: 3.5 };
+                }
+
                 // Score increment (초당 ~10점 + 순환마다 25% 증가 → 계절 전환도 빨라짐)
                 const scoreBoost = 1 + (gameState.winterCount || 0) * 0.25;
                 gameState.score += deltaTime * 10 * scoreBoost;
@@ -3934,21 +3962,23 @@
 
             _addVillains(pool, level) {
                 const result = [...pool];
-                // ★ 매 순환마다 악당 가중치 증가 (체감 확실하게)
                 const wc = gameState.winterCount || 0;
-                const villainWeight = Math.min(8, 1 + wc); // 순환1=2배, 순환2=3배 ... 최대 8배
-                // LV.0~ : 삐뚤이 (보라 슬라임)
-                if (level >= 0) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-slime');
-                // LV.3~ : 까미 (검은 고양이) → 순환 2회부터 레벨 무관 등장
-                if (level >= 3 || wc >= 2) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-cat');
-                // LV.8~ : 불꽃이 (공중 화염) → 순환 3회부터 레벨 무관 등장
-                if (level >= 8 || wc >= 3) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-flame');
-                // LV.15~ : 가시왕 (거대 가시 몬스터) → 순환 4회부터 레벨 무관 등장
-                if (level >= 15 || wc >= 4) for (let v = 0; v < villainWeight; v++) result.push('villain-spike');
-                // LV.30~ : 유령이 (투명 유령) → 순환 5회부터 레벨 무관 등장
-                if (level >= 30 || wc >= 5) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-ghost');
-                // LV.50~ : 다크동 (보스급) → 순환 6회부터 레벨 무관 등장
-                if (level >= 50 || wc >= 6) for (let v = 0; v < villainWeight; v++) result.push('villain-dark');
+                const sc = gameState.score || 0;
+                // ★★★ 500점 극악 모드: 악당 가중치 폭증 ★★★
+                let villainWeight;
+                if (sc >= 500) {
+                    villainWeight = Math.min(15, 5 + Math.floor((sc - 500) / 100)); // 500점=5, 600=6 ...
+                } else {
+                    villainWeight = Math.min(8, 1 + wc);
+                }
+                // 500점 이상이면 모든 악당 종류 무조건 등장
+                const fury = sc >= 500;
+                if (level >= 0 || fury) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-slime');
+                if (level >= 3 || wc >= 2 || fury) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-cat');
+                if (level >= 8 || wc >= 3 || fury) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-flame');
+                if (level >= 15 || wc >= 4 || fury) for (let v = 0; v < villainWeight; v++) result.push('villain-spike');
+                if (level >= 30 || wc >= 5 || fury) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-ghost');
+                if (level >= 50 || wc >= 6 || fury) for (let v = 0; v < villainWeight; v++) result.push('villain-dark');
                 return result;
             }
 
@@ -4086,9 +4116,10 @@
             draw(ctx) {
                 this.background.draw(ctx);
 
-                // ??? 난이도 시각 효과 (순환 5회 이상)
+                // ★ 극악 모드 시각 효과 (500점 이상 또는 순환 5회)
                 const hellWc = gameState.winterCount || 0;
-                if (hellWc >= 5) {
+                const hellScore = gameState.score || 0;
+                if (hellScore >= 500 || hellWc >= 5) {
                     ctx.save();
                     // 화면 미세 흔들림 (긴장감)
                     const shakeX = (Math.random() - 0.5) * 3;
@@ -4112,8 +4143,8 @@
                 this.coins.forEach(c => c.draw(ctx));
                 this.powerUps.forEach(p => p.draw(ctx));
 
-                // ??? 화면 효과 복원
-                if (hellWc >= 5) ctx.restore();
+                // 극악 화면 효과 복원
+                if (hellScore >= 500 || hellWc >= 5) ctx.restore();
 
                 // HUD
                 ctx.fillStyle = '#000000';
@@ -4133,24 +4164,22 @@
                     ctx.font = 'bold 16px Arial';
                     ctx.fillStyle = '#4488CC';
                     ctx.fillText(`❄️${gameState.winterCount}/${nextLvAt}`, 370, 24);
-                    // 난이도 표시 (순환 5회마다 단계 증가)
+                }
+                // 난이도 표시: 500점 극악 모드 우선, 아니면 순환 기반
+                const hudScore = gameState.score || 0;
+                if (hudScore >= 500) {
+                    const blink = Math.sin(Date.now() * 0.008) > 0;
+                    ctx.fillStyle = blink ? '#FF0000' : '#FFD700';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText('💀 극악', 440, 26);
+                } else if (gameState.winterCount >= 1) {
+                    const diffColors = ['#FF8800', '#FF4400', '#FF0000', '#CC00FF', '#880088'];
+                    const diffNames = ['어려움', '매우어려움', '극한', '지옥', '???'];
                     const wcNow = gameState.winterCount;
-                    if (wcNow >= 1) {
-                        const diffColors = ['#FF8800', '#FF4400', '#FF0000', '#CC00FF', '#880088'];
-                        const diffNames = ['어려움', '매우어려움', '극한', '지옥', '???'];
-                        const idx = Math.min(wcNow - 1, diffNames.length - 1);
-                        if (wcNow >= 5) {
-                            // ??? 깜빡이는 빨간 텍스트
-                            const blink = Math.sin(Date.now() * 0.01) > 0;
-                            ctx.fillStyle = blink ? '#FF0000' : '#880088';
-                            ctx.font = 'bold 15px Arial';
-                            ctx.fillText('💀 ???', 440, 26);
-                        } else {
-                            ctx.fillStyle = diffColors[idx];
-                            ctx.font = 'bold 13px Arial';
-                            ctx.fillText(`🔥${diffNames[idx]}`, 440, 26);
-                        }
-                    }
+                    const idx = Math.min(wcNow - 1, diffNames.length - 1);
+                    ctx.fillStyle = diffColors[idx];
+                    ctx.font = 'bold 13px Arial';
+                    ctx.fillText(`🔥${diffNames[idx]}`, 440, 26);
                 }
 
                 ctx.fillStyle = '#000000';
@@ -5178,7 +5207,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.9.7';
+        const GAME_VERSION = 'v3.9.8';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
