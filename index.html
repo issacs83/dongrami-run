@@ -3188,10 +3188,19 @@
                             this.obstacles = this.obstacles.filter(o => o !== obstacle);
                             this.player.activePowerUp = null;
                         } else if (gameState.invulnTimer <= 0) {
-                            // 하트 감소
-                            gameState.lives--;
+                            // 악당은 목숨 2개, 일반 장애물은 1개
+                            const isVillain = obstacle.type.startsWith('villain-');
+                            const damage = isVillain ? 2 : 1;
+                            gameState.lives = Math.max(0, gameState.lives - damage);
                             gameState.invulnTimer = 2.0; // 2초 무적
-                            this.particles.createExplosion(obstacle.x, obstacle.y, '#FF0000', 10);
+
+                            if (isVillain) {
+                                // 악당: 더 강렬한 폭발 이펙트 (빨강+보라)
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#FF0000', 15);
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#9B59B6', 10);
+                            } else {
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#FF0000', 10);
+                            }
                             this.obstacles = this.obstacles.filter(o => o !== obstacle);
                             audioManager.playJumpSound(); // 피격음
 
