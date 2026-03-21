@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.9.8';
+        var CURRENT_VER = 'v3.9.9';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1859,7 +1859,7 @@
                 const sc = gameState.score || 0;
                 let hellBoost = 1 + wc * 0.2;
                 // ★ 500점부터 추가 속도 폭증
-                if (sc >= 500) hellBoost += 0.5 + (sc - 500) * 0.003; // 500=+0.5, 700=+1.1, 1000=+2.0
+                if (sc >= 500) hellBoost += 1.5 + (sc - 500) * 0.005; // 500=+1.5, 600=+2.0, 700=+2.5 ...
                 const sp = gameSpeed * hellBoost;
 
                 switch(this.type) {
@@ -3104,7 +3104,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.9.8', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.9.9', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3810,12 +3810,12 @@
                 // ★★★ 500점 극악 모드: 점수에 비례하여 속도 급상승 ★★★
                 const currentScore = gameState.score || 0;
                 if (currentScore >= 500) {
-                    // 500점 이후 100점마다 속도 +1.0 추가 (500=+1, 600=+2, 700=+3 ...)
+                    // 500점 진입 즉시 +3.5 속도 폭증, 이후 점수당 +0.025 추가
                     const overScore = currentScore - 500;
-                    finalSpeed += 1.0 + overScore * 0.01; // 기본 +1 + 100점당 +1 추가
+                    finalSpeed += 3.5 + overScore * 0.025; // 500=+3.5, 600=+6, 700=+8.5 ...
                 }
 
-                gameState.gameSpeed = Math.min(20, finalSpeed); // 최대 20
+                gameState.gameSpeed = Math.min(22, finalSpeed); // 최대 22
                 // 천사 능력: 속도 부스트 (15% 빠르게)
                 const angelAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
                 if (angelAbility?.type === 'angelBlessing' && angelAbility.speedBoost) {
@@ -3838,19 +3838,22 @@
                     const sc = gameState.score || 0;
 
                     if (sc >= 500) {
-                        // ★★★ 500점 극악 모드: 장애물 폭풍 ★★★
-                        // 500점=0.5~0.8초, 700점=0.3~0.5초, 1000점=0.2~0.3초
-                        const fury = Math.min(3, (sc - 500) / 200); // 0~3 단계
-                        const spMin = Math.max(0.15, 0.5 - fury * 0.12);
-                        const spRange = Math.max(0.1, 0.3 - fury * 0.07);
+                        // ★★★ 500점 극악 모드: 처음부터 장애물 지옥 ★★★
+                        const fury = Math.min(3, (sc - 500) / 150); // 더 빠르게 단계 상승
+                        const spMin = Math.max(0.1, 0.25 - fury * 0.05); // 시작부터 0.25초
+                        const spRange = Math.max(0.05, 0.15 - fury * 0.03);
                         this.obstacleTimer = spMin + Math.random() * spRange;
-                        // 60% 확률 동시 2개
-                        if (Math.random() < 0.6) {
-                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 120);
+                        // 80% 확률 동시 2개 (즉시 빡빡하게)
+                        if (Math.random() < 0.8) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 100);
                         }
-                        // 30% 확률 3개
-                        if (Math.random() < 0.3) {
-                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 250);
+                        // 50% 확률 3개
+                        if (Math.random() < 0.5) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
+                        }
+                        // 20% 확률 4개 (극악 중 극악)
+                        if (Math.random() < 0.2) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 320);
                         }
                     } else {
                         // 일반 모드: 순환 기반 난이도
@@ -3967,7 +3970,7 @@
                 // ★★★ 500점 극악 모드: 악당 가중치 폭증 ★★★
                 let villainWeight;
                 if (sc >= 500) {
-                    villainWeight = Math.min(15, 5 + Math.floor((sc - 500) / 100)); // 500점=5, 600=6 ...
+                    villainWeight = Math.min(20, 8 + Math.floor((sc - 500) / 50)); // 500=8, 550=9, 600=10 ...
                 } else {
                     villainWeight = Math.min(8, 1 + wc);
                 }
@@ -5207,7 +5210,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.9.8';
+        const GAME_VERSION = 'v3.9.9';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
