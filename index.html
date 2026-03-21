@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.9.2';
+        var CURRENT_VER = 'v3.9.3';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -878,10 +878,101 @@
                 cost: 1000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 천사 (프리미엄 캐릭터 - 악당&버섯 면역 + 속도 부스트)
+            const angel = {
+                name: '천사', colors: { main: '#FFFFFF', secondary: '#FFD700' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const float = Math.sin(frameIndex * 0.08) * 2;
+                    ctx.translate(0, float);
+                    // 성스러운 빛 오라
+                    const auraGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, 36);
+                    auraGrad.addColorStop(0, 'rgba(255,255,200,0.2)');
+                    auraGrad.addColorStop(0.6, 'rgba(255,215,0,0.08)');
+                    auraGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                    ctx.fillStyle = auraGrad;
+                    ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2); ctx.fill();
+                    // 날개 (왼쪽)
+                    const wingFlap = Math.sin(frameIndex * 0.18) * 6;
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                    ctx.strokeStyle = '#E0D8C0'; ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(-16, -2);
+                    ctx.quadraticCurveTo(-34, -18 + wingFlap, -28, -28 + wingFlap);
+                    ctx.quadraticCurveTo(-22, -18 + wingFlap, -20, -12);
+                    ctx.quadraticCurveTo(-28, -14 + wingFlap, -24, -22 + wingFlap);
+                    ctx.quadraticCurveTo(-16, -10, -14, 2);
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                    // 날개 (오른쪽)
+                    ctx.beginPath();
+                    ctx.moveTo(16, -2);
+                    ctx.quadraticCurveTo(34, -18 + wingFlap, 28, -28 + wingFlap);
+                    ctx.quadraticCurveTo(22, -18 + wingFlap, 20, -12);
+                    ctx.quadraticCurveTo(28, -14 + wingFlap, 24, -22 + wingFlap);
+                    ctx.quadraticCurveTo(16, -10, 14, 2);
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                    // 몸체 (하얀색 + 밝은 그라데이션)
+                    const bodyGrad = ctx.createRadialGradient(-2, -3, 3, 0, 0, 22);
+                    bodyGrad.addColorStop(0, '#FFFFFF');
+                    bodyGrad.addColorStop(0.5, '#FFF8F0');
+                    bodyGrad.addColorStop(0.8, '#F0E6D4');
+                    bodyGrad.addColorStop(1, '#E8DCC8');
+                    ctx.fillStyle = bodyGrad;
+                    ctx.beginPath(); ctx.arc(0, 2, 22, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 1.5;
+                    ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 6; ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    // 후광 (머리 위 금빛 링)
+                    const haloGlow = 0.7 + Math.sin(frameIndex * 0.12) * 0.3;
+                    ctx.strokeStyle = `rgba(255,215,0,${haloGlow})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -26, 14, 5, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.strokeStyle = `rgba(255,255,200,${haloGlow * 0.5})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -26, 16, 6, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                    // 눈 (순수한 큰 눈)
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, -3, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -3, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#4A90D9';
+                    ctx.beginPath(); ctx.arc(-7, -2, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -2, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, -4, 2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -4, 2, 0, Math.PI * 2); ctx.fill();
+                    // 미소 (순수한 미소)
+                    ctx.strokeStyle = '#D4A574'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.arc(0, 5, 8, 0.15, Math.PI - 0.15); ctx.stroke();
+                    // 볼 홍조
+                    ctx.fillStyle = 'rgba(255,182,193,0.4)';
+                    ctx.beginPath(); ctx.arc(-14, 5, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(14, 5, 5, 0, Math.PI * 2); ctx.fill();
+                    // 점프 시 깃털 파티클
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.5;
+                        for (let i = 0; i < 6; i++) {
+                            const a = frameIndex * 0.1 + i * 1.05;
+                            const r = 30 + Math.sin(a * 1.5) * 6;
+                            ctx.fillStyle = i % 2 === 0 ? '#FFF' : '#FFD700';
+                            const fx = Math.cos(a) * r;
+                            const fy = Math.sin(a) * r + 8;
+                            ctx.beginPath(); ctx.ellipse(fx, fy, 3, 1.5, a, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 2000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '악마', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '악마', '천사', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '악마': akma, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -945,6 +1036,7 @@
             '동그라미하준': { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
             '가스미': { name: '방귀 부스터', desc: '독가스로 주변 적 제거 (10회)', type: 'fartBoost', charges: 10 },
             '악마': { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
+            '천사': { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
             '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
         };
 
@@ -3000,7 +3092,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.9.2', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.9.3', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3691,6 +3783,11 @@
                     GAME_CONFIG.maxSpeed,
                     GAME_CONFIG.initialSpeed + (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed) * Math.pow(t, 2.5)
                 );
+                // 천사 능력: 속도 부스트 (15% 빠르게)
+                const angelAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                if (angelAbility?.type === 'angelBlessing' && angelAbility.speedBoost) {
+                    gameState.gameSpeed = Math.min(GAME_CONFIG.maxSpeed * 1.1, gameState.gameSpeed * angelAbility.speedBoost);
+                }
 
                 // LV.100 도달 → 엔딩 씬으로 전환!
                 if (gameState.speedLevel >= 100 && !gameState.endingTriggered) {
@@ -3871,6 +3968,18 @@
                                 return; // 데미지 무시
                             }
 
+                            // 천사 능력: 악당 + 버섯 면역
+                            if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'angelBlessing' &&
+                                (obstacle.type.startsWith('villain-') || obstacle.type === 'mushroom')) {
+                                gameState.invulnTimer = 0.5;
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#FFD700', 14);
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#FFFFFF', 10);
+                                this.obstacles = this.obstacles.filter(o => o !== obstacle);
+                                if (obstacle.type.startsWith('villain-')) addCoins(3);
+                                audioManager.playCoinSound();
+                                return; // 데미지 무시
+                            }
+
                             // 악당은 목숨 2개, 일반 장애물은 1개
                             const isVillain = obstacle.type.startsWith('villain-');
                             const damage = isVillain ? 2 : 1;
@@ -4025,6 +4134,13 @@
                     ctx.font = 'bold 14px Arial';
                     ctx.textAlign = 'left';
                     ctx.fillText('😈 악당 면역!', 15, 135);
+                }
+                // 천사 축복 HUD
+                if (abilityType === 'angelBlessing') {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('👼 악당&버섯 면역 + 속도↑', 15, 135);
                 }
                 // 가스미 방귀 부스터 HUD
                 if (abilityType === 'fartBoost') {
@@ -4946,7 +5062,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.9.2';
+        const GAME_VERSION = 'v3.9.3';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
