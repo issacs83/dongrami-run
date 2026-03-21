@@ -2258,12 +2258,12 @@
             }
         };
 
-        // 계절 순환: 봄→여름→가을→겨울→봄→여름→... (200점 주기)
+        // 계절 순환: 봄→여름→가을→겨울→봄→여름→... (400점 주기 — 한 계절 약 10초)
         function getCurrentSeason(score) {
-            const cycle = score % 200;
-            if (cycle < 50) return 'spring';
-            if (cycle < 100) return 'summer';
-            if (cycle < 150) return 'autumn';
+            const cycle = score % 400;
+            if (cycle < 100) return 'spring';
+            if (cycle < 200) return 'summer';
+            if (cycle < 300) return 'autumn';
             return 'winter';
         }
 
@@ -3189,7 +3189,7 @@
                 // ─────────────────────────────────────────────────────────
                 // ★ 핵심 규칙:
                 //   - 계절 변화는 속도에 영향 없음 (시각효과만)
-                //   - 봄→여름→가을→겨울 = 1세트 (200점)
+                //   - 봄→여름→가을→겨울 = 1세트 (400점)
                 //   - 5세트(겨울 5회 통과) = 레벨 1 증가
                 //   - 레벨 0~100, 레벨에 따른 지수적 속도 증가
                 //   - 낮은 레벨: 속도 거의 안 올라감
