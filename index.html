@@ -112,9 +112,9 @@
             groundY: 576 * 0.82,  // 82% down the screen
             playerStartX: 80,
             playerSize: 64,
-            initialSpeed: 3,
-            maxSpeed: 7,
-            speedIncrease: 0.000012,
+            initialSpeed: 4.5,
+            maxSpeed: 12,
+            speedIncrease: 0.0001,
             gravity: 0.42,
             jumpPower: -14.5,
             obstacleMinGap: 450,
@@ -421,8 +421,11 @@
             invulnTimer: 0,    // 피격 후 무적 시간
             bestScore: parseInt(localStorage.getItem('bestScore')) || 0,
             bestCoins: parseInt(localStorage.getItem('bestCoins')) || 0,
+            bestSpeedLevel: parseInt(localStorage.getItem('bestSpeedLevel')) || 0,
             totalCoins: parseInt(localStorage.getItem('totalCoins')) || 300,
+            totalGames: parseInt(localStorage.getItem('totalGames')) || 0,
             gameSpeed: GAME_CONFIG.initialSpeed,
+            speedLevel: 0,
             isRunning: false,
             isPaused: false,
             currentScene: 'title',
@@ -1328,9 +1331,9 @@
                 if (this.cloudX < -100000) this.cloudX += 100000;
                 this.time += deltaTime;
 
-                // 계절 전환
+                // 계절 전환 (이전 전환이 완료되지 않아도 즉시 새 계절로 전환 시작)
                 const newSeason = getCurrentSeason(score || 0);
-                if (newSeason !== this.currentSeason && this.transitionT >= 1) {
+                if (newSeason !== this.currentSeason) {
                     this.prevSeason = this.currentSeason;
                     this.currentSeason = newSeason;
                     this.transitionT = 0;
@@ -1791,6 +1794,8 @@
                     gameState.coinsEarned = 0;
                     gameState.lives = gameState.maxLives;
                     gameState.invulnTimer = 0;
+                    gameState.speedLevel = 0;
+                    gameState.gameSpeed = GAME_CONFIG.initialSpeed;
                     gameState.currentScene = 'game';
                     gameState.isRunning = true;
                     gameState.isPaused = false;
@@ -2017,12 +2022,13 @@
 
                 this.background.update(deltaTime, gameState.score);
 
-                // 계절 전환 감지 → 배너 표시
-                const newSeason = getCurrentSeason(gameState.score);
-                if (newSeason !== this.lastSeason) {
+                // 계절 전환 감지 → 배경의 실제 계절 상태를 기준으로 배너 표시
+                const bgSeason = this.background.currentSeason;
+                const bgReady = this.background.transitionT >= 0.5; // 전환이 50% 이상 진행되면 배너 표시
+                if (bgReady && bgSeason !== this.lastSeason) {
                     const labels = { spring: '🌸 봄이 왔어요!', summer: '☀️ 여름이 왔어요!', autumn: '🍂 가을이 왔어요!', winter: '❄️ 겨울이 왔어요!' };
-                    this.seasonBanner = { text: labels[newSeason], timer: 3.0 };
-                    this.lastSeason = newSeason;
+                    this.seasonBanner = { text: labels[bgSeason], timer: 3.0 };
+                    this.lastSeason = bgSeason;
                 }
                 if (this.seasonBanner && this.seasonBanner.timer > 0) {
                     this.seasonBanner.timer -= deltaTime;
@@ -2031,11 +2037,14 @@
                 this.player.update(inputState, deltaTime);
                 this.particles.update(deltaTime);
 
-                // Update speed
+                // Update speed & level (0~100)
                 gameState.gameSpeed = Math.min(
                     GAME_CONFIG.maxSpeed,
                     GAME_CONFIG.initialSpeed + gameState.score * GAME_CONFIG.speedIncrease
                 );
+                gameState.speedLevel = Math.min(100, Math.floor(
+                    ((gameState.gameSpeed - GAME_CONFIG.initialSpeed) / (GAME_CONFIG.maxSpeed - GAME_CONFIG.initialSpeed)) * 100
+                ));
 
                 // Spawn obstacles (deltaTime 기반 — 끊김 방지)
                 this.obstacleTimer -= deltaTime;
@@ -2206,6 +2215,12 @@
                 ctx.textBaseline = 'top';
                 ctx.fillText(`점수: ${Math.floor(gameState.score)}`, 20, 20);
 
+                // 속도 레벨 표시 (점수 옆)
+                ctx.font = 'bold 22px Arial';
+                ctx.fillStyle = gameState.speedLevel >= 80 ? '#FF2200' : gameState.speedLevel >= 50 ? '#FF8800' : '#0066CC';
+                ctx.fillText(`⚡ LV.${gameState.speedLevel}`, 230, 22);
+
+                ctx.fillStyle = '#000000';
                 ctx.font = 'bold 24px Arial';
                 ctx.fillText(`동전: ${gameState.coins}`, 20, 60);
 
@@ -2271,13 +2286,20 @@
                 // 기록 저장
                 this.finalScore = Math.floor(gameState.score);
                 this.finalCoins = gameState.coins;
+                this.finalSpeedLevel = gameState.speedLevel;
                 this.isNewBest = this.finalScore > gameState.bestScore;
                 gameState.bestScore = Math.max(gameState.bestScore, this.finalScore);
                 gameState.bestCoins = Math.max(gameState.bestCoins, this.finalCoins);
+                gameState.bestSpeedLevel = Math.max(gameState.bestSpeedLevel || 0, this.finalSpeedLevel);
                 gameState.totalCoins += this.finalCoins;
-                localStorage.setItem('bestScore', gameState.bestScore);
-                localStorage.setItem('bestCoins', gameState.bestCoins);
-                localStorage.setItem('totalCoins', gameState.totalCoins);
+                gameState.totalGames = (gameState.totalGames || 0) + 1;
+                try {
+                    localStorage.setItem('bestScore', gameState.bestScore);
+                    localStorage.setItem('bestCoins', gameState.bestCoins);
+                    localStorage.setItem('bestSpeedLevel', gameState.bestSpeedLevel);
+                    localStorage.setItem('totalCoins', gameState.totalCoins);
+                    localStorage.setItem('totalGames', gameState.totalGames);
+                } catch(e) { /* localStorage 사용 불가 환경 대응 */ }
 
                 // 게임 시간 계산
                 this.playTime = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
@@ -2336,8 +2358,8 @@
                 const panelAlpha = Math.min(1, this.animTime / 0.5);
                 ctx.globalAlpha = panelAlpha;
 
-                const pw = 480, ph = 460;
-                const px = cx - pw / 2, py = 55;
+                const pw = 480, ph = 500;
+                const px = cx - pw / 2, py = 40;
                 ctx.fillStyle = 'rgba(255,255,255,0.95)';
                 ctx.beginPath();
                 ctx.roundRect(px, py, pw, ph, 20);
@@ -2432,6 +2454,17 @@
                 ctx.font = 'bold 22px Arial';
                 ctx.fillText(this.reachedSeason, px + pw - 60, ly);
 
+                // 속도 레벨
+                ly += lineH;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#444';
+                ctx.font = '22px Arial';
+                ctx.fillText('속도 레벨', px + 60, ly);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = this.finalSpeedLevel >= 80 ? '#FF2200' : '#0066CC';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText(`LV.${this.finalSpeedLevel}`, px + pw - 60, ly);
+
                 // 버튼 영역
                 const btnY = py + ph - 75;
                 const btnW = 180, btnH = 55;
@@ -2457,20 +2490,29 @@
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillText('🏠 메인메뉴', menuX + btnW / 2, btnY + btnH / 2);
                 } else {
-                    // 버튼 비활성 상태
+                    // 버튼 비활성 상태 — 대기 메시지를 버튼 위에 별도 표시
                     ctx.fillStyle = '#AAAAAA';
                     ctx.beginPath();
                     ctx.roundRect(retryX, btnY, btnW, btnH, 12);
                     ctx.fill();
+                    ctx.fillStyle = '#DDDDDD';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🔄 다시하기', retryX + btnW / 2, btnY + btnH / 2);
+
+                    ctx.fillStyle = '#AAAAAA';
                     ctx.beginPath();
                     ctx.roundRect(menuX, btnY, btnW, btnH, 12);
                     ctx.fill();
+                    ctx.fillStyle = '#DDDDDD';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillText('🏠 메인메뉴', menuX + btnW / 2, btnY + btnH / 2);
 
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.font = '20px Arial';
-                    ctx.textAlign = 'center';
+                    // 대기 메시지를 버튼 아래에 표시 (겹침 방지)
                     const waitSec = Math.ceil(this.inputDelay);
-                    ctx.fillText(`잠시만요... (${waitSec}초)`, cx, btnY + btnH / 2);
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = '18px Arial';
+                    ctx.fillText(`잠시만요... (${waitSec}초)`, cx, btnY + btnH + 22);
                 }
 
                 ctx.restore();
@@ -2486,8 +2528,8 @@
                 if (mx === undefined || my === undefined) return;
 
                 const cx = GAME_CONFIG.width / 2;
-                const pw = 480, ph = 460;
-                const btnY = 55 + ph - 75;
+                const pw = 480, ph = 500;
+                const btnY = 40 + ph - 75;
                 const btnW = 180, btnH = 55;
                 const retryX = cx - btnW - 15;
                 const menuX = cx + 15;
@@ -2499,6 +2541,8 @@
                     gameState.coinsEarned = 0;
                     gameState.lives = gameState.maxLives;
                     gameState.invulnTimer = 0;
+                    gameState.speedLevel = 0;
+                    gameState.gameSpeed = GAME_CONFIG.initialSpeed;
                     gameState.currentScene = 'game';
                     gameState.isRunning = true;
                     gameState.isPaused = false;
