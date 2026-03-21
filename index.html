@@ -451,32 +451,96 @@
         // 최종 순서: 동그라미, 네모미, 별미, 삼각미, 김여름, 하트미, 동그라미하준
         (function setupExtraCharacters() {
             const kimYeoreum = {
-                name: '김여름', colors: { main: '#FFD700', secondary: '#FF8C00' }, size: 64,
+                name: '김여름', colors: { main: '#FFF5EE', secondary: '#FFB6C1' }, size: 64,
                 drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
                     ctx.save(); ctx.translate(x + 32, y + 32);
-                    const glow = 1 + Math.sin(frameIndex * 0.15) * 0.08; ctx.scale(glow, glow);
-                    ctx.fillStyle = '#FFD700';
-                    for (let i = 0; i < 8; i++) {
-                        const angle = frameIndex * 0.03 + (i * Math.PI / 4);
-                        ctx.save(); ctx.rotate(angle);
-                        ctx.beginPath(); ctx.moveTo(-5, -20); ctx.lineTo(0, -32); ctx.lineTo(5, -20);
-                        ctx.closePath(); ctx.fill(); ctx.restore();
+                    const squish = isDucking ? 0.7 : 1.0;
+                    const squishX = isDucking ? 1.2 : 1.0;
+                    const wobble = Math.sin(frameIndex * 0.12) * 1.5;
+                    ctx.scale(squishX, squish);
+
+                    // 마시멜로 본체 (부드러운 흰색 원통형)
+                    const mGrad = ctx.createRadialGradient(-4, -6, 3, 0, 0, 24);
+                    mGrad.addColorStop(0, '#FFFFFF');
+                    mGrad.addColorStop(0.5, '#FFF5EE');
+                    mGrad.addColorStop(0.85, '#FFE4E1');
+                    mGrad.addColorStop(1, '#FFD1CC');
+                    ctx.fillStyle = mGrad;
+                    // 둥글넓적한 마시멜로 형태 (rounded rect)
+                    ctx.beginPath();
+                    ctx.roundRect(-22, -20 + wobble, 44, 44, 18);
+                    ctx.fill();
+                    ctx.strokeStyle = '#F0C0B8'; ctx.lineWidth = 1.5; ctx.stroke();
+
+                    // 마시멜로 윗면 하이라이트 (반짝)
+                    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                    ctx.beginPath();
+                    ctx.ellipse(0, -16 + wobble, 16, 5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 볼 (핑크 홍조)
+                    ctx.fillStyle = 'rgba(255,150,170,0.5)';
+                    ctx.beginPath(); ctx.ellipse(-14, 6 + wobble, 6, 4, -0.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(14, 6 + wobble, 6, 4, 0.2, 0, Math.PI * 2); ctx.fill();
+
+                    // 눈 (동그란 점 눈 — 맬로맨 스타일)
+                    ctx.fillStyle = '#2C2C2C';
+                    ctx.beginPath(); ctx.arc(-8, -2 + wobble, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -2 + wobble, 3, 0, Math.PI * 2); ctx.fill();
+                    // 눈 하이라이트
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-7, -3.5 + wobble, 1.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -3.5 + wobble, 1.2, 0, Math.PI * 2); ctx.fill();
+
+                    // 입 (작고 귀여운 미소)
+                    ctx.strokeStyle = '#D4837A'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.arc(0, 8 + wobble, 5, 0.2, Math.PI - 0.2, false); ctx.stroke();
+
+                    // 이름표 "여름"
+                    ctx.fillStyle = '#FFB6C1';
+                    ctx.beginPath(); ctx.roundRect(-14, 18 + wobble, 28, 10, 5); ctx.fill();
+                    ctx.fillStyle = '#FFF'; ctx.font = 'bold 7px Arial';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('여름', 0, 23 + wobble);
+
+                    // 짧은 팔 (양옆에 작게)
+                    ctx.fillStyle = '#FFE4E1';
+                    ctx.beginPath(); ctx.ellipse(-24, 4 + wobble, 5, 7, -0.3, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#F0C0B8'; ctx.lineWidth = 1; ctx.stroke();
+                    ctx.beginPath(); ctx.ellipse(24, 4 + wobble, 5, 7, 0.3, 0, Math.PI * 2); ctx.fill();
+                    ctx.stroke();
+
+                    // 다리
+                    if (!isDucking) {
+                        const lo = Math.sin(frameIndex * 0.3) * 3;
+                        ctx.fillStyle = '#FFE4E1';
+                        ctx.beginPath(); ctx.ellipse(-8, 27 + lo, 5, 6, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.ellipse(8, 27 - lo, 5, 6, 0, 0, Math.PI * 2); ctx.fill();
                     }
-                    const sg = ctx.createRadialGradient(0,0,5,0,0,22);
-                    sg.addColorStop(0,'#FFEE44'); sg.addColorStop(0.6,'#FFD700'); sg.addColorStop(1,'#FF8C00');
-                    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill();
-                    ctx.strokeStyle = '#FF6600'; ctx.lineWidth = 2; ctx.stroke();
-                    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.roundRect(-16,-10,12,8,2); ctx.fill();
-                    ctx.beginPath(); ctx.roundRect(4,-10,12,8,2); ctx.fill();
-                    ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
-                    ctx.beginPath(); ctx.moveTo(-4,-6); ctx.lineTo(4,-6); ctx.stroke();
-                    ctx.strokeStyle = '#CC4400'; ctx.lineWidth = 2.5;
-                    ctx.beginPath(); ctx.arc(0,4,8,0.1,Math.PI-0.1,false); ctx.stroke();
+
+                    // 점프 시 반짝이 이펙트
                     if (isJumping) {
-                        ctx.fillStyle = 'rgba(255,100,0,0.6)';
-                        for (let i = 0; i < 5; i++) { const fa = frameIndex*0.1+i*1.2;
-                            ctx.beginPath(); ctx.arc(Math.cos(fa)*28, Math.sin(fa)*28, 3, 0, Math.PI*2); ctx.fill(); }
+                        ctx.globalAlpha = 0.6;
+                        ctx.fillStyle = '#FFB6C1';
+                        for (let i = 0; i < 5; i++) {
+                            const sa = frameIndex * 0.08 + i * 1.3;
+                            const sr = 26 + i * 4;
+                            const sparkX = Math.cos(sa) * sr;
+                            const sparkY = Math.sin(sa) * sr + wobble;
+                            // 별 모양 반짝이
+                            ctx.save(); ctx.translate(sparkX, sparkY); ctx.rotate(frameIndex * 0.1 + i);
+                            ctx.beginPath();
+                            for (let j = 0; j < 4; j++) {
+                                const a = j * Math.PI / 2;
+                                ctx.moveTo(0, 0);
+                                ctx.lineTo(Math.cos(a) * 3, Math.sin(a) * 3);
+                            }
+                            ctx.strokeStyle = '#FFB6C1'; ctx.lineWidth = 1.5; ctx.stroke();
+                            ctx.restore();
+                        }
+                        ctx.globalAlpha = 1;
                     }
+
                     ctx.restore();
                 },
                 cost: 1000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
@@ -1334,6 +1398,19 @@
                     'mushroom':     { w: 45, h: 55,  y: GAME_CONFIG.groundY - 55,  color: '#FF4444' },
                     // 나무 그루터기
                     'stump':        { w: 55, h: 45,  y: GAME_CONFIG.groundY - 45,  color: '#8B5E3C' },
+                    // === 악당 캐릭터들 ===
+                    // 1. 삐뚤이 (LV.0~) — 작은 보라색 슬라임 악당
+                    'villain-slime':   { w: 50, h: 45,  y: GAME_CONFIG.groundY - 45,  color: '#9B59B6' },
+                    // 2. 까미 (LV.3~) — 검은 고양이 악당, 빠르게 달려옴
+                    'villain-cat':     { w: 55, h: 50,  y: GAME_CONFIG.groundY - 50,  color: '#2C3E50' },
+                    // 3. 불꽃이 (LV.8~) — 공중 화염 악당
+                    'villain-flame':   { w: 50, h: 50,  y: GAME_CONFIG.groundY - 110 - Math.random() * 40, color: '#E74C3C' },
+                    // 4. 가시왕 (LV.15~) — 거대 가시 몬스터
+                    'villain-spike':   { w: 70, h: 75,  y: GAME_CONFIG.groundY - 75,  color: '#7F8C8D' },
+                    // 5. 유령이 (LV.30~) — 투명해졌다 나타나는 유령
+                    'villain-ghost':   { w: 55, h: 60,  y: GAME_CONFIG.groundY - 100 - Math.random() * 30, color: '#BDC3C7' },
+                    // 6. 보스악당 다크동 (LV.50~) — 동그라미의 어둠 버전
+                    'villain-dark':    { w: 64, h: 64,  y: GAME_CONFIG.groundY - 64,  color: '#1A1A2E' },
                 };
 
                 const def = defs[type] || defs['cactus-small'];
@@ -1568,6 +1645,250 @@
                     ctx.beginPath();
                     ctx.ellipse(cx, this.y + 10, 5, 3, 0, 0, Math.PI * 2);
                     ctx.stroke();
+
+                } else if (this.type === 'villain-slime') {
+                    // 삐뚤이 — 보라색 슬라임 악당
+                    const bounce = Math.sin(this.frameIndex * 0.8) * 3;
+                    // 슬라임 몸체
+                    const slimeGrad = ctx.createRadialGradient(cx - 3, cy - 8 + bounce, 3, cx, cy + bounce, 22);
+                    slimeGrad.addColorStop(0, '#C39BD3');
+                    slimeGrad.addColorStop(0.6, '#9B59B6');
+                    slimeGrad.addColorStop(1, '#6C3483');
+                    ctx.fillStyle = slimeGrad;
+                    ctx.beginPath();
+                    // 물결치는 슬라임 형태
+                    ctx.moveTo(this.x + 2, this.y + this.height);
+                    ctx.quadraticCurveTo(this.x + 5, cy - 5 + bounce, cx - 10, this.y + 5 + bounce);
+                    ctx.quadraticCurveTo(cx, this.y - 5 + bounce, cx + 10, this.y + 5 + bounce);
+                    ctx.quadraticCurveTo(this.x + this.width - 5, cy - 5 + bounce, this.x + this.width - 2, this.y + this.height);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.strokeStyle = '#6C3483'; ctx.lineWidth = 1.5; ctx.stroke();
+                    // 사악한 눈 (X자)
+                    ctx.strokeStyle = '#FFF'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.moveTo(cx - 12, cy - 6 + bounce); ctx.lineTo(cx - 6, cy + bounce); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(cx - 6, cy - 6 + bounce); ctx.lineTo(cx - 12, cy + bounce); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(cx + 6, cy - 6 + bounce); ctx.lineTo(cx + 12, cy + bounce); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(cx + 12, cy - 6 + bounce); ctx.lineTo(cx + 6, cy + bounce); ctx.stroke();
+                    // 삐죽 입
+                    ctx.strokeStyle = '#FFF'; ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 8, cy + 8 + bounce);
+                    ctx.lineTo(cx - 4, cy + 5 + bounce);
+                    ctx.lineTo(cx, cy + 10 + bounce);
+                    ctx.lineTo(cx + 4, cy + 5 + bounce);
+                    ctx.lineTo(cx + 8, cy + 8 + bounce);
+                    ctx.stroke();
+
+                } else if (this.type === 'villain-cat') {
+                    // 까미 — 검은 고양이 악당
+                    const run = Math.sin(this.frameIndex * 0.6) * 2;
+                    // 몸통
+                    ctx.fillStyle = '#2C3E50';
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy + 5 + run, 20, 16, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 머리
+                    ctx.beginPath();
+                    ctx.arc(cx + 16, cy - 8 + run, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 귀 (삼각형)
+                    ctx.beginPath();
+                    ctx.moveTo(cx + 7, cy - 20 + run); ctx.lineTo(cx + 12, cy - 8 + run); ctx.lineTo(cx + 4, cy - 10 + run);
+                    ctx.closePath(); ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(cx + 25, cy - 20 + run); ctx.lineTo(cx + 20, cy - 8 + run); ctx.lineTo(cx + 28, cy - 10 + run);
+                    ctx.closePath(); ctx.fill();
+                    // 귀 안쪽 (핑크)
+                    ctx.fillStyle = '#E91E63';
+                    ctx.beginPath();
+                    ctx.moveTo(cx + 9, cy - 17 + run); ctx.lineTo(cx + 12, cy - 10 + run); ctx.lineTo(cx + 6, cy - 11 + run);
+                    ctx.closePath(); ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(cx + 23, cy - 17 + run); ctx.lineTo(cx + 20, cy - 10 + run); ctx.lineTo(cx + 26, cy - 11 + run);
+                    ctx.closePath(); ctx.fill();
+                    // 빛나는 빨간 눈
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath(); ctx.arc(cx + 11, cy - 10 + run, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 21, cy - 10 + run, 3, 0, Math.PI * 2); ctx.fill();
+                    // 눈 하이라이트
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(cx + 10, cy - 11 + run, 1.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 20, cy - 11 + run, 1.2, 0, Math.PI * 2); ctx.fill();
+                    // 꼬리 (구불구불)
+                    ctx.strokeStyle = '#2C3E50'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 18, cy + 2 + run);
+                    ctx.quadraticCurveTo(cx - 28, cy - 15 + run, cx - 22, cy - 25 + Math.sin(this.frameIndex * 0.4) * 5 + run);
+                    ctx.stroke();
+                    // 다리 (달리는 모션)
+                    ctx.fillStyle = '#2C3E50';
+                    const legAnim = Math.sin(this.frameIndex * 0.8) * 6;
+                    ctx.fillRect(cx - 8, cy + 16 + legAnim, 5, 10);
+                    ctx.fillRect(cx + 3, cy + 16 - legAnim, 5, 10);
+                    ctx.fillRect(cx + 12, cy + 16 + legAnim, 5, 10);
+
+                } else if (this.type === 'villain-flame') {
+                    // 불꽃이 — 공중 화염 악당
+                    const flicker = Math.sin(this.frameIndex * 1.2) * 3;
+                    // 외곽 불꽃
+                    ctx.fillStyle = 'rgba(255,100,0,0.4)';
+                    ctx.beginPath(); ctx.arc(cx, cy + flicker, 24, 0, Math.PI * 2); ctx.fill();
+                    // 내부 불꽃 몸체
+                    const fireGrad = ctx.createRadialGradient(cx, cy + flicker, 3, cx, cy + flicker, 18);
+                    fireGrad.addColorStop(0, '#FFEB3B');
+                    fireGrad.addColorStop(0.4, '#FF9800');
+                    fireGrad.addColorStop(0.8, '#E74C3C');
+                    fireGrad.addColorStop(1, '#C0392B');
+                    ctx.fillStyle = fireGrad;
+                    ctx.beginPath(); ctx.arc(cx, cy + flicker, 18, 0, Math.PI * 2); ctx.fill();
+                    // 불꽃 꼬리 (위로 솟아오름)
+                    ctx.fillStyle = '#FF5722';
+                    for (let i = 0; i < 5; i++) {
+                        const fa = this.frameIndex * 0.3 + i * 1.3;
+                        const fx = cx + Math.sin(fa) * 8;
+                        const fy = cy - 18 - i * 5 + Math.sin(fa * 1.5) * 3 + flicker;
+                        const fr = 5 - i * 0.7;
+                        ctx.globalAlpha = 0.8 - i * 0.15;
+                        ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                    // 성난 눈
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(cx - 6, cy - 2 + flicker, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 6, cy - 2 + flicker, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(cx - 5, cy - 1 + flicker, 2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 7, cy - 1 + flicker, 2, 0, Math.PI * 2); ctx.fill();
+                    // 화난 눈썹
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(cx - 10, cy - 7 + flicker); ctx.lineTo(cx - 3, cy - 5 + flicker); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(cx + 10, cy - 7 + flicker); ctx.lineTo(cx + 3, cy - 5 + flicker); ctx.stroke();
+                    // 입
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(cx, cy + 7 + flicker, 6, 0.3, Math.PI - 0.3, true); ctx.stroke();
+
+                } else if (this.type === 'villain-spike') {
+                    // 가시왕 — 거대 가시 몬스터
+                    // 몸통 (짙은 회색 육각형)
+                    ctx.fillStyle = '#5D6D7E';
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const a = i * Math.PI / 3 - Math.PI / 6;
+                        const px = cx + Math.cos(a) * 25;
+                        const py = cy + Math.sin(a) * 25;
+                        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                    }
+                    ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = '#2C3E50'; ctx.lineWidth = 2; ctx.stroke();
+                    // 가시들 (바깥으로 뾰족)
+                    ctx.fillStyle = '#E74C3C';
+                    for (let i = 0; i < 8; i++) {
+                        const sa = this.frameIndex * 0.05 + i * Math.PI / 4;
+                        ctx.save(); ctx.translate(cx, cy); ctx.rotate(sa);
+                        ctx.beginPath();
+                        ctx.moveTo(-4, -24); ctx.lineTo(0, -38); ctx.lineTo(4, -24);
+                        ctx.closePath(); ctx.fill();
+                        ctx.restore();
+                    }
+                    // 무서운 얼굴
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath(); ctx.arc(cx - 8, cy - 5, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 8, cy - 5, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(cx - 8, cy - 6, 2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 8, cy - 6, 2, 0, Math.PI * 2); ctx.fill();
+                    // 이빨 달린 입
+                    ctx.fillStyle = '#2C3E50';
+                    ctx.beginPath(); ctx.arc(cx, cy + 8, 10, 0, Math.PI, false); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    for (let t = 0; t < 4; t++) {
+                        ctx.beginPath();
+                        ctx.moveTo(cx - 8 + t * 5, cy + 8);
+                        ctx.lineTo(cx - 5.5 + t * 5, cy + 14);
+                        ctx.lineTo(cx - 3 + t * 5, cy + 8);
+                        ctx.closePath(); ctx.fill();
+                    }
+
+                } else if (this.type === 'villain-ghost') {
+                    // 유령이 — 투명해졌다 나타나는 유령
+                    const ghostAlpha = 0.4 + Math.sin(this.frameIndex * 0.3) * 0.35;
+                    const float = Math.sin(this.frameIndex * 0.25) * 8;
+                    ctx.globalAlpha = ghostAlpha;
+                    // 유령 몸체
+                    const ghostGrad = ctx.createRadialGradient(cx, cy - 5 + float, 5, cx, cy + float, 25);
+                    ghostGrad.addColorStop(0, '#FFFFFF');
+                    ghostGrad.addColorStop(0.6, '#ECF0F1');
+                    ghostGrad.addColorStop(1, '#BDC3C7');
+                    ctx.fillStyle = ghostGrad;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy - 8 + float, 22, Math.PI, 0);
+                    // 물결치는 아랫단
+                    ctx.lineTo(cx + 22, cy + 15 + float);
+                    ctx.quadraticCurveTo(cx + 15, cy + 8 + float, cx + 8, cy + 18 + float);
+                    ctx.quadraticCurveTo(cx, cy + 10 + float, cx - 8, cy + 18 + float);
+                    ctx.quadraticCurveTo(cx - 15, cy + 8 + float, cx - 22, cy + 15 + float);
+                    ctx.closePath();
+                    ctx.fill();
+                    // 무서운 눈 (큰 검은 구멍)
+                    ctx.fillStyle = '#2C3E50';
+                    ctx.beginPath(); ctx.ellipse(cx - 8, cy - 8 + float, 5, 7, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(cx + 8, cy - 8 + float, 5, 7, 0, 0, Math.PI * 2); ctx.fill();
+                    // 눈 안 빛
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.beginPath(); ctx.arc(cx - 7, cy - 8 + float, 2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 9, cy - 8 + float, 2, 0, Math.PI * 2); ctx.fill();
+                    // 입 (O형)
+                    ctx.fillStyle = '#2C3E50';
+                    ctx.beginPath(); ctx.ellipse(cx, cy + 5 + float, 6, 8, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1;
+
+                } else if (this.type === 'villain-dark') {
+                    // 다크동 — 동그라미의 어둠 버전 (보스급)
+                    const pulse = Math.sin(this.frameIndex * 0.2) * 2;
+                    // 어두운 오라
+                    ctx.fillStyle = 'rgba(26,26,46,0.3)';
+                    ctx.beginPath(); ctx.arc(cx, cy + pulse, 32, 0, Math.PI * 2); ctx.fill();
+                    // 몸체 (동그라미와 비슷하지만 어두움)
+                    const darkGrad = ctx.createRadialGradient(cx - 3, cy - 5 + pulse, 3, cx, cy + pulse, 26);
+                    darkGrad.addColorStop(0, '#34495E');
+                    darkGrad.addColorStop(0.5, '#2C3E50');
+                    darkGrad.addColorStop(1, '#1A1A2E');
+                    ctx.fillStyle = darkGrad;
+                    ctx.beginPath(); ctx.arc(cx, cy + pulse, 26, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#E74C3C'; ctx.lineWidth = 2; ctx.stroke();
+                    // 빛나는 빨간 눈
+                    ctx.fillStyle = '#E74C3C';
+                    ctx.shadowColor = '#E74C3C'; ctx.shadowBlur = 10;
+                    ctx.beginPath(); ctx.arc(cx - 9, cy - 5 + pulse, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + 9, cy - 5 + pulse, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.shadowBlur = 0;
+                    // 눈동자 (세로 슬릿 — 뱀 눈)
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(cx - 10, cy - 9 + pulse, 2, 8);
+                    ctx.fillRect(cx + 8, cy - 9 + pulse, 2, 8);
+                    // 사악한 미소
+                    ctx.strokeStyle = '#E74C3C'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.arc(cx, cy + 8 + pulse, 10, 0.2, Math.PI - 0.2, false); ctx.stroke();
+                    // 이빨
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 5, cy + 8 + pulse); ctx.lineTo(cx - 3, cy + 14 + pulse); ctx.lineTo(cx - 1, cy + 8 + pulse);
+                    ctx.closePath(); ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(cx + 1, cy + 8 + pulse); ctx.lineTo(cx + 3, cy + 14 + pulse); ctx.lineTo(cx + 5, cy + 8 + pulse);
+                    ctx.closePath(); ctx.fill();
+                    // 어둠 파티클 (주변에 떠다니는 작은 조각들)
+                    ctx.fillStyle = '#8E44AD';
+                    for (let i = 0; i < 6; i++) {
+                        const pa = this.frameIndex * 0.15 + i * 1.05;
+                        const pr = 30 + Math.sin(pa * 0.7) * 5;
+                        const px = cx + Math.cos(pa) * pr;
+                        const py = cy + Math.sin(pa) * pr + pulse;
+                        ctx.globalAlpha = 0.5 + Math.sin(pa) * 0.3;
+                        ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
 
                 } else {
                     // 선인장 (기본)
@@ -2797,6 +3118,7 @@
             spawnObstacle() {
                 const score = gameState.score;
                 const season = getCurrentSeason(score);
+                const level = gameState.speedLevel || 0;
                 let pool;
 
                 if (score < 30) {
@@ -2818,8 +3140,28 @@
                     pool = this._addSeasonObstacles(base, season);
                 }
 
+                // 레벨에 따른 악당 캐릭터 추가
+                pool = this._addVillains(pool, level);
+
                 const type = pool[Math.floor(Math.random() * pool.length)];
                 this.obstacles.push(new Obstacle(type, score));
+            }
+
+            _addVillains(pool, level) {
+                const result = [...pool];
+                // LV.0~ : 삐뚤이 (보라 슬라임) — 항상 등장 가능
+                if (level >= 0) result.push('villain-slime', 'villain-slime');
+                // LV.3~ : 까미 (검은 고양이)
+                if (level >= 3) result.push('villain-cat', 'villain-cat');
+                // LV.8~ : 불꽃이 (공중 화염)
+                if (level >= 8) result.push('villain-flame', 'villain-flame');
+                // LV.15~ : 가시왕 (거대 가시 몬스터)
+                if (level >= 15) result.push('villain-spike');
+                // LV.30~ : 유령이 (투명 유령)
+                if (level >= 30) result.push('villain-ghost', 'villain-ghost');
+                // LV.50~ : 다크동 (보스급 — 동그라미 어둠 버전)
+                if (level >= 50) result.push('villain-dark');
+                return result;
             }
 
             _addSeasonObstacles(base, season) {
