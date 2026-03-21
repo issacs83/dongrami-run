@@ -3,11 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <!-- PWA 잘못된 경로로 실행 시 올바른 경로로 리다이렉트 -->
+    <!-- 캐시 방지 -->
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+    <!-- PWA 잘못된 경로로 실행 시 올바른 경로로 리다이렉트 + 강제 버전 체크 -->
     <script>
     if (window.location.pathname === '/' || window.location.pathname === '') {
         window.location.replace('/dongrami-run/');
     }
+    // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
+    (function() {
+        var CURRENT_VER = 'v3.8.0';
+        try {
+            var savedVer = localStorage.getItem('dongrami_version');
+            if (savedVer && savedVer !== CURRENT_VER) {
+                // 버전 불일치 → 모든 캐시 삭제 후 강제 새로고침
+                localStorage.setItem('dongrami_version', CURRENT_VER);
+                if ('caches' in window) {
+                    caches.keys().then(function(names) {
+                        names.forEach(function(name) { caches.delete(name); });
+                    }).then(function() {
+                        window.location.reload(true);
+                    });
+                } else {
+                    window.location.reload(true);
+                }
+            } else if (!savedVer) {
+                localStorage.setItem('dongrami_version', CURRENT_VER);
+            }
+        } catch(e) {}
+    })();
     </script>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2806,7 +2832,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.7.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.8.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4454,7 +4480,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.7.0';
+        const GAME_VERSION = 'v3.8.0';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
