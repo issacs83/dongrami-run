@@ -18,9 +18,12 @@
     <meta property="og:title" content="동그라미 런 🏃‍♂️">
     <meta property="og:description" content="귀여운 캐릭터로 달리는 무한 러너 게임! 친구랑 점수 대결하자!">
     <meta property="og:type" content="website">
-    <meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><circle cx='100' cy='100' r='80' fill='%23FF4444'/><circle cx='80' cy='85' r='12' fill='white'/><circle cx='120' cy='85' r='12' fill='white'/><circle cx='83' cy='85' r='6' fill='black'/><circle cx='123' cy='85' r='6' fill='black'/><path d='M 80 115 Q 100 135 120 115' stroke='black' stroke-width='4' fill='none'/></svg>">
+    <meta property="og:image" content="https://issacs83.github.io/dongrami-run/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://issacs83.github.io/dongrami-run/og-image.png">
     <meta name="twitter:title" content="동그라미 런 🏃‍♂️">
     <meta name="twitter:description" content="귀여운 캐릭터로 달리는 무한 러너 게임! 친구랑 점수 대결하자!">
     <link rel="manifest" href="manifest.json">
@@ -2761,7 +2764,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.4.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.5.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4276,6 +4279,26 @@
         });
 
         engine.run();
+
+        // Service Worker 등록 + 업데이트 알림
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
+                // 새 버전 감지
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+                            // 업데이트 배너 표시
+                            const banner = document.createElement('div');
+                            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;text-align:center;font-size:16px;font-weight:bold;z-index:99999;cursor:pointer;font-family:sans-serif;';
+                            banner.textContent = '🎮 새 버전이 있어요! 터치하여 업데이트';
+                            banner.onclick = () => location.reload();
+                            document.body.appendChild(banner);
+                        }
+                    });
+                });
+            }).catch(err => console.log('SW 등록 실패:', err));
+        }
     </script>
 </body>
 </html>
