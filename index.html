@@ -65,22 +65,32 @@
         #rotateOverlay { display: none; }
 
         @media screen and (max-width: 768px) and (orientation: portrait) {
+            html, body {
+                overflow: hidden;
+                margin: 0; padding: 0;
+                width: 100%; height: 100%;
+            }
             #gameContainer {
                 position: fixed;
                 top: 0; left: 0;
-                width: 100vh !important;
-                height: 100vw !important;
+                /* 실제 뷰포트 크기 사용 (dvh = dynamic viewport height) */
+                width: 100dvh !important;
+                height: 100dvw !important;
+                /* fallback for older browsers */
+                width: calc(var(--vh, 1vh) * 100) !important;
+                height: calc(var(--vw, 1vw) * 100) !important;
                 transform: rotate(90deg);
                 transform-origin: top left;
-                margin-left: 100vw;
+                margin-left: 100dvw;
                 display: flex !important;
                 justify-content: center;
                 align-items: center;
-                overflow: hidden;
+                background: #000;
             }
             #gameCanvas {
-                width: 100vh !important;
-                height: 100vw !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                object-fit: contain;
             }
         }
         @media screen and (max-width: 768px) and (orientation: landscape) {
@@ -638,9 +648,10 @@
             score: 0,
             coins: 0,
             coinsEarned: 0,
-            lives: 3,          // 하트 3개
-            maxLives: 3,
+            lives: 5,          // 하트 5개
+            maxLives: 5,
             invulnTimer: 0,    // 피격 후 무적 시간
+            hitFlashTimer: 0,  // 피격 번쩍 이펙트 타이머
             bestScore: parseInt(localStorage.getItem('bestScore')) || 0,
             bestCoins: parseInt(localStorage.getItem('bestCoins')) || 0,
             bestSpeedLevel: parseInt(localStorage.getItem('bestSpeedLevel')) || 0,
@@ -2603,7 +2614,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.0.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.3.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3184,7 +3195,18 @@
                     if (this.checkAABBCollision(playerHitbox, obstacle.getHitbox())) {
                         if (this.player.activePowerUp === 'shield') {
                             // 쉴드로 파괴
-                            this.particles.createExplosion(obstacle.x, obstacle.y, '#FF00FF', 12);
+                            const isVillainShield = obstacle.type.startsWith('villain-');
+                            if (isVillainShield) {
+                                // 악당을 쉴드로 처치하면 보너스 코인!
+                                const bonusCoins = obstacle.type === 'villain-dark' ? 10 : 5;
+                                gameState.coins += bonusCoins;
+                                gameState.coinsEarned += bonusCoins;
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#FFD700', 20);
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#9B59B6', 12);
+                                audioManager.playCoinSound();
+                            } else {
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#FF00FF', 12);
+                            }
                             this.obstacles = this.obstacles.filter(o => o !== obstacle);
                             this.player.activePowerUp = null;
                         } else if (gameState.invulnTimer <= 0) {
@@ -3193,6 +3215,7 @@
                             const damage = isVillain ? 2 : 1;
                             gameState.lives = Math.max(0, gameState.lives - damage);
                             gameState.invulnTimer = 2.0; // 2초 무적
+                            gameState.hitFlashTimer = isVillain ? 0.5 : 0.25; // 악당은 더 강한 번쩍
 
                             if (isVillain) {
                                 // 악당: 더 강렬한 폭발 이펙트 (빨강+보라)
@@ -3295,10 +3318,19 @@
                     ctx.fillText(i < gameState.lives ? '❤️' : '🖤', 20 + i * 35, 100);
                 }
 
-                // 피격 무적 표시
-                if (gameState.invulnTimer > 0) {
-                    ctx.fillStyle = 'rgba(255,0,0,0.3)';
-                    ctx.fillRect(0, 0, GAME_CONFIG.width, 5);
+                // 피격 빨간 번쩍 이펙트
+                if (gameState.hitFlashTimer > 0) {
+                    const flashAlpha = Math.min(0.45, gameState.hitFlashTimer * 1.2);
+                    ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
+                    ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+                    gameState.hitFlashTimer -= 1/60; // 프레임당 감소
+                }
+
+                // 피격 무적 표시 (테두리 깜빡임)
+                if (gameState.invulnTimer > 0 && Math.floor(gameState.invulnTimer * 6) % 2 === 0) {
+                    ctx.strokeStyle = 'rgba(255,0,0,0.5)';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(2, 2, GAME_CONFIG.width - 4, GAME_CONFIG.height - 4);
                 }
 
                 // 계절 전환 오버레이 (BGM 크로스페이드 + 시각 효과)
@@ -3710,12 +3742,19 @@
         canvas.height = GAME_CONFIG.height;
 
         // 캔버스를 화면에 맞게 리사이즈 (세로 모드 자동 가로 회전 지원)
+        function updateVhVw() {
+            // 실제 뷰포트 크기를 CSS 변수로 설정 (주소표시줄 등 고려)
+            document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
+            document.documentElement.style.setProperty('--vw', window.innerWidth * 0.01 + 'px');
+        }
+
         function resizeCanvas() {
+            updateVhVw();
             const container = document.getElementById('gameContainer');
             const isMobilePortrait = window.innerWidth <= 768 && window.innerWidth < window.innerHeight;
             let containerW, containerH;
             if (isMobilePortrait) {
-                // 세로 모드: CSS가 90도 회전시키므로 가로=vh, 세로=vw
+                // 세로 모드: CSS가 90도 회전 → 가용 가로=innerHeight, 세로=innerWidth
                 containerW = window.innerHeight;
                 containerH = window.innerWidth;
             } else {
@@ -3727,7 +3766,7 @@
             canvas.style.height = (GAME_CONFIG.height * scale) + 'px';
         }
         window.addEventListener('resize', resizeCanvas);
-        window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
+        window.addEventListener('orientationchange', () => { setTimeout(resizeCanvas, 100); setTimeout(resizeCanvas, 300); });
         resizeCanvas();
 
         // 가능하면 화면 방향을 가로로 잠금 (지원하는 브라우저)
