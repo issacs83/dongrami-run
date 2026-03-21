@@ -61,34 +61,29 @@
             -webkit-user-select: none;
         }
 
-        /* 모바일 세로 모드일 때 가로로 회전 안내 */
-        #rotateOverlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: #000;
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: #FFF;
-            font-family: Arial, sans-serif;
-        }
-        #rotateOverlay .icon { font-size: 80px; animation: rotatePhone 2s ease-in-out infinite; }
-        #rotateOverlay .text { font-size: 22px; margin-top: 20px; font-weight: bold; }
-        #rotateOverlay .sub { font-size: 14px; margin-top: 8px; color: #AAA; }
-        @keyframes rotatePhone {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(90deg); }
-            75% { transform: rotate(90deg); }
-        }
+        /* 모바일 세로 모드 → 자동 가로 회전 (CSS transform) */
+        #rotateOverlay { display: none; }
 
         @media screen and (max-width: 768px) and (orientation: portrait) {
-            #rotateOverlay { display: flex !important; }
-            #gameContainer { display: none !important; }
+            #gameContainer {
+                position: fixed;
+                top: 0; left: 0;
+                width: 100vh !important;
+                height: 100vw !important;
+                transform: rotate(90deg);
+                transform-origin: top left;
+                margin-left: 100vw;
+                display: flex !important;
+                justify-content: center;
+                align-items: center;
+                overflow: hidden;
+            }
+            #gameCanvas {
+                width: 100vh !important;
+                height: 100vw !important;
+            }
         }
         @media screen and (max-width: 768px) and (orientation: landscape) {
-            #rotateOverlay { display: none !important; }
             #gameContainer { display: flex !important; }
         }
     </style>
@@ -3705,17 +3700,33 @@
         canvas.width = GAME_CONFIG.width;
         canvas.height = GAME_CONFIG.height;
 
-        // 캔버스를 화면에 맞게 리사이즈
+        // 캔버스를 화면에 맞게 리사이즈 (세로 모드 자동 가로 회전 지원)
         function resizeCanvas() {
             const container = document.getElementById('gameContainer');
-            const containerW = container.clientWidth;
-            const containerH = container.clientHeight;
+            const isMobilePortrait = window.innerWidth <= 768 && window.innerWidth < window.innerHeight;
+            let containerW, containerH;
+            if (isMobilePortrait) {
+                // 세로 모드: CSS가 90도 회전시키므로 가로=vh, 세로=vw
+                containerW = window.innerHeight;
+                containerH = window.innerWidth;
+            } else {
+                containerW = container.clientWidth;
+                containerH = container.clientHeight;
+            }
             const scale = Math.min(containerW / GAME_CONFIG.width, containerH / GAME_CONFIG.height);
             canvas.style.width = (GAME_CONFIG.width * scale) + 'px';
             canvas.style.height = (GAME_CONFIG.height * scale) + 'px';
         }
         window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
         resizeCanvas();
+
+        // 가능하면 화면 방향을 가로로 잠금 (지원하는 브라우저)
+        try {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        } catch(e) {}
 
         // 첫 실행 시 보너스 코인 300개 지급
         if (!localStorage.getItem('dongramiRunInitialized')) {
