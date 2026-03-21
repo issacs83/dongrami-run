@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.8.2';
+        var CURRENT_VER = 'v3.8.3';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -2842,11 +2842,21 @@
                 ctx.font = '15px Arial';
                 ctx.fillText('탭 = 점프 / 더블탭 = 더블점프 / 아래 스와이프 = 숙이기', GAME_CONFIG.width/2, 455);
 
+                // 새로고침 버튼 (좌측 하단)
+                ctx.fillStyle = '#4CAF50';
+                ctx.beginPath();
+                ctx.roundRect(15, GAME_CONFIG.height - 50, 110, 38, 10);
+                ctx.fill();
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 18px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('🔄 새로고침', 70, GAME_CONFIG.height - 31);
+
                 // 버전 표시 (우측 하단)
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.8.2', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.8.3', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -2896,6 +2906,17 @@
                 // 설정 버튼 영역
                 if (mx >= cx + 10 && mx <= cx + 150 && my >= 375 && my <= 425) {
                     gameState.currentScene = 'settings';
+                }
+                // 새로고침 버튼 영역 (좌측 하단)
+                if (mx >= 15 && mx <= 125 && my >= GAME_CONFIG.height - 50 && my <= GAME_CONFIG.height - 12) {
+                    // 캐시 삭제 후 강제 새로고침
+                    if ('caches' in window) {
+                        caches.keys().then(function(names) {
+                            names.forEach(function(name) { caches.delete(name); });
+                        }).then(function() { window.location.reload(true); });
+                    } else {
+                        window.location.reload(true);
+                    }
                 }
             }
         }
@@ -4513,7 +4534,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.8.2';
+        const GAME_VERSION = 'v3.8.3';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
