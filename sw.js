@@ -1,5 +1,5 @@
-// 동그라미 런 Service Worker v3.10.6
-const CACHE_VERSION = 'v3.10.6';
+// 동그라미 런 Service Worker v3.10.7
+const CACHE_VERSION = 'v3.10.7';
 const CACHE_NAME = 'dongrami-run-' + CACHE_VERSION;
 const ASSETS = [
     '/dongrami-run/',

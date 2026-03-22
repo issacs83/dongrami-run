@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.10.6';
+        var CURRENT_VER = 'v3.10.7';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -2021,8 +2021,14 @@
                 const wc = gameState.winterCount || 0;
                 const sc = gameState.score || 0;
                 let hellBoost = 1 + wc * 0.2;
-                // ★ 500점부터 추가 속도 폭증
-                if (sc >= 500) hellBoost += 0.2 + (sc - 500) * 0.001; // 500=+0.2, 600=+0.3, 700=+0.4 ...
+                // ★ 구간별 악당 속도
+                if (sc >= 1500) {
+                    hellBoost += 0.8 + (sc - 1500) * 0.003;
+                } else if (sc >= 1000) {
+                    // 휴식 구간: 보너스 없음
+                } else if (sc >= 500) {
+                    hellBoost += 0.2 + (sc - 500) * 0.001;
+                }
                 const sp = gameSpeed * hellBoost;
 
                 switch(this.type) {
@@ -3267,7 +3273,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.10.6', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.10.7', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3857,8 +3863,10 @@
                 this.flyingActive = false;
                 // 파도미 파도 이펙트 타이머
                 this.waveEffectTimer = 0;
-                // 극악 모드 배너
+                // 구간별 모드 배너 플래그
                 this.furyModeTriggered = false;
+                this.restModeTriggered = false;
+                this.fury2ModeTriggered = false;
             }
 
             update(inputState, deltaTime) {
@@ -4014,15 +4022,22 @@
                 const cycleSpeedBonus = (gameState.winterCount || 0) * 0.8;
                 let finalSpeed = baseSpeed + cycleSpeedBonus;
 
-                // ★★★ 500점 극악 모드: 점수에 비례하여 속도 급상승 ★★★
+                // ★★★ 구간별 난이도 시스템 ★★★
                 const currentScore = gameState.score || 0;
-                if (currentScore >= 500) {
-                    // 500점 진입 시 +0.8, 이후 아주 천천히 상승
+                if (currentScore >= 1500) {
+                    // 1500+ 진짜 극악: 속도 대폭 상승
+                    const overScore = currentScore - 1500;
+                    finalSpeed += 2.5 + overScore * 0.012;
+                } else if (currentScore >= 1000) {
+                    // 1000~1499 휴식 구간: 속도 보너스 없음 (일반 난이도로 복귀)
+                    finalSpeed += 0;
+                } else if (currentScore >= 500) {
+                    // 500~999 극악: 속도 상승
                     const overScore = currentScore - 500;
-                    finalSpeed += 0.8 + overScore * 0.005; // 500=+0.8, 600=+1.3, 700=+1.8 ...
+                    finalSpeed += 0.8 + overScore * 0.005;
                 }
 
-                gameState.gameSpeed = Math.min(14, finalSpeed); // 최대 14
+                gameState.gameSpeed = Math.min(16, finalSpeed); // 최대 16
                 // 천사 능력: 속도 부스트 (15% 빠르게)
                 const angelAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
                 if (angelAbility?.type === 'angelBlessing' && angelAbility.speedBoost) {
@@ -4044,13 +4059,32 @@
                     const wc = gameState.winterCount || 0;
                     const sc = gameState.score || 0;
 
-                    if (sc >= 500) {
-                        // ★★★ 500점 극악 모드: 쉬운 난이도 ★★★
-                        const fury = Math.min(3, (sc - 500) / 400); // 매우 천천히 상승
-                        const spMin = Math.max(0.4, 0.7 - fury * 0.1); // 시작 0.7초
+                    if (sc >= 1500) {
+                        // ★★★ 1500+ 진짜 극악: 빠른 스폰 ★★★
+                        const fury = Math.min(3, (sc - 1500) / 200);
+                        const spMin = Math.max(0.2, 0.4 - fury * 0.07);
+                        const spRange = Math.max(0.1, 0.25 - fury * 0.05);
+                        this.obstacleTimer = spMin + Math.random() * spRange;
+                        if (Math.random() < 0.5) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 150);
+                        }
+                        if (Math.random() < 0.2) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 280);
+                        }
+                    } else if (sc >= 1000) {
+                        // ★★★ 1000~1499 휴식 구간: 일반 난이도 ★★★
+                        const baseMin = Math.max(0.5, 1.2 - wc * 0.3);
+                        const baseRange = Math.max(0.3, 0.8 - wc * 0.15);
+                        this.obstacleTimer = baseMin + Math.random() * baseRange;
+                        if (wc >= 2 && Math.random() < 0.15) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
+                        }
+                    } else if (sc >= 500) {
+                        // ★★★ 500~999 극악 ★★★
+                        const fury = Math.min(3, (sc - 500) / 400);
+                        const spMin = Math.max(0.4, 0.7 - fury * 0.1);
                         const spRange = Math.max(0.2, 0.4 - fury * 0.07);
                         this.obstacleTimer = spMin + Math.random() * spRange;
-                        // 20% 확률 동시 2개
                         if (Math.random() < 0.2) {
                             setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
                         }
@@ -4114,10 +4148,19 @@
                 // Collision detection
                 this.checkCollisions(deltaTime);
 
-                // 500점 극악 모드 진입 감지
-                if (!this.furyModeTriggered && (gameState.score || 0) >= 500) {
+                // 구간별 모드 전환 배너
+                const modeScore = gameState.score || 0;
+                if (!this.furyModeTriggered && modeScore >= 500) {
                     this.furyModeTriggered = true;
                     this.diffUpBanner = { text: '💀 극악 모드 돌입!! 💀', timer: 3.5 };
+                }
+                if (!this.restModeTriggered && modeScore >= 1000) {
+                    this.restModeTriggered = true;
+                    this.diffUpBanner = { text: '😌 휴식 구간! 잠시 쉬어가세요~', timer: 3.5 };
+                }
+                if (!this.fury2ModeTriggered && modeScore >= 1500) {
+                    this.fury2ModeTriggered = true;
+                    this.diffUpBanner = { text: '💀💀 진짜 극악 모드!! 💀💀', timer: 3.5 };
                 }
 
                 // Score increment (초당 ~10점 + 순환마다 25% 증가 → 계절 전환도 빨라짐)
@@ -4168,12 +4211,16 @@
                 const sc = gameState.score || 0;
                 // ★★★ 500점 극악 모드: 악당 가중치 폭증 ★★★
                 let villainWeight;
-                if (sc >= 500) {
-                    villainWeight = Math.min(6, 2 + Math.floor((sc - 500) / 200)); // 500=2, 700=3, 900=4 ...
+                if (sc >= 1500) {
+                    villainWeight = Math.min(10, 5 + Math.floor((sc - 1500) / 100)); // 1500=5, 1600=6 ...
+                } else if (sc >= 1000) {
+                    villainWeight = Math.min(4, 1 + wc); // 휴식 구간: 일반 수준
+                } else if (sc >= 500) {
+                    villainWeight = Math.min(6, 2 + Math.floor((sc - 500) / 200)); // 500=2, 700=3
                 } else {
                     villainWeight = Math.min(8, 1 + wc);
                 }
-                // 500점 이상이면 모든 악당 종류 무조건 등장
+                // 500점 이상 또는 1500점 이상이면 모든 악당 등장
                 const fury = sc >= 500;
                 if (level >= 0 || fury) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-slime');
                 if (level >= 3 || wc >= 2 || fury) for (let v = 0; v < 2 * villainWeight; v++) result.push('villain-cat');
@@ -4318,10 +4365,11 @@
             draw(ctx) {
                 this.background.draw(ctx);
 
-                // ★ 극악 모드 시각 효과 (500점 이상 또는 순환 5회)
+                // ★ 극악 모드 시각 효과 (500~999, 1500+ 또는 순환 5회)
                 const hellWc = gameState.winterCount || 0;
                 const hellScore = gameState.score || 0;
-                if (hellScore >= 500 || hellWc >= 5) {
+                const isHellZone = (hellScore >= 500 && hellScore < 1000) || hellScore >= 1500 || hellWc >= 5;
+                if (isHellZone) {
                     ctx.save();
                     // 화면 미세 흔들림 (긴장감)
                     const shakeX = (Math.random() - 0.5) * 3;
@@ -4346,7 +4394,7 @@
                 this.powerUps.forEach(p => p.draw(ctx));
 
                 // 극악 화면 효과 복원
-                if (hellScore >= 500 || hellWc >= 5) ctx.restore();
+                if (isHellZone) ctx.restore();
 
                 // HUD
                 ctx.fillStyle = '#000000';
@@ -4369,7 +4417,16 @@
                 }
                 // 난이도 표시: 500점 극악 모드 우선, 아니면 순환 기반
                 const hudScore = gameState.score || 0;
-                if (hudScore >= 500) {
+                if (hudScore >= 1500) {
+                    const blink = Math.sin(Date.now() * 0.01) > 0;
+                    ctx.fillStyle = blink ? '#FF0000' : '#FF4400';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText('💀💀 진짜극악', 410, 26);
+                } else if (hudScore >= 1000) {
+                    ctx.fillStyle = '#4CAF50';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText('😌 휴식', 440, 26);
+                } else if (hudScore >= 500) {
                     const blink = Math.sin(Date.now() * 0.008) > 0;
                     ctx.fillStyle = blink ? '#FF0000' : '#FFD700';
                     ctx.font = 'bold 16px Arial';
@@ -5556,7 +5613,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.10.6';
+        const GAME_VERSION = 'v3.10.7';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
