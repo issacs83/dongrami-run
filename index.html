@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.11.1';
+        var CURRENT_VER = 'v3.11.2';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1320,6 +1320,15 @@
                 if (!localStorage.getItem(eventKey)) {
                     const current = parseInt(localStorage.getItem('totalCoins')) || 300;
                     localStorage.setItem('totalCoins', current + 20000000);
+                    localStorage.setItem(eventKey, 'claimed');
+                }
+            })(),
+            // ★ 코인 이벤트 3: 1,000,000코인 추가 지급!
+            _coinEvent3: (() => {
+                const eventKey = 'coinEvent_20260322_v3';
+                if (!localStorage.getItem(eventKey)) {
+                    const current = parseInt(localStorage.getItem('totalCoins')) || 300;
+                    localStorage.setItem('totalCoins', current + 1000000);
                     localStorage.setItem(eventKey, 'claimed');
                 }
             })(),
@@ -3461,7 +3470,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.11.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.11.2', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -5820,7 +5829,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.11.1';
+        const GAME_VERSION = 'v3.11.2';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
