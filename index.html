@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.10.9';
+        var CURRENT_VER = 'v3.11.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -954,6 +954,89 @@
                 cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 무사 (최강 캐릭터 - 버섯 외 모든 데미지 면역 + 코인10배)
+            const musa = {
+                name: '무사', colors: { main: '#B71C1C', secondary: '#4A148C' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const sway = Math.sin(frameIndex * 0.1) * 1.5;
+                    // 전투 오라
+                    const auraAlpha = 0.1 + Math.sin(frameIndex * 0.06) * 0.05;
+                    ctx.fillStyle = `rgba(183,28,28,${auraAlpha})`;
+                    ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2); ctx.fill();
+                    // 몸체 (갑옷)
+                    const bodyGrad = ctx.createRadialGradient(-3, -4, 3, 0, 0, 22);
+                    bodyGrad.addColorStop(0, '#EF5350');
+                    bodyGrad.addColorStop(0.3, '#C62828');
+                    bodyGrad.addColorStop(0.7, '#B71C1C');
+                    bodyGrad.addColorStop(1, '#7F0000');
+                    ctx.fillStyle = bodyGrad;
+                    ctx.beginPath(); ctx.arc(0, 2, 22, 0, Math.PI * 2); ctx.fill();
+                    // 갑옷 장식 (가슴 십자)
+                    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2.5;
+                    ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(0, 12); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(-8, 2); ctx.lineTo(8, 2); ctx.stroke();
+                    // 투구
+                    ctx.fillStyle = '#4A148C';
+                    ctx.beginPath();
+                    ctx.moveTo(-18, -8);
+                    ctx.quadraticCurveTo(-20, -22, 0, -26);
+                    ctx.quadraticCurveTo(20, -22, 18, -8);
+                    ctx.lineTo(-18, -8);
+                    ctx.fill();
+                    // 투구 장식 (뿔)
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.moveTo(-2, -26); ctx.lineTo(0, -34); ctx.lineTo(2, -26);
+                    ctx.fill();
+                    // 눈 (날카로운 전투 눈빛)
+                    ctx.fillStyle = '#FFF';
+                    ctx.fillRect(-11, -6, 9, 5);
+                    ctx.fillRect(2, -6, 9, 5);
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillRect(-8, -5, 4, 4);
+                    ctx.fillRect(5, -5, 4, 4);
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(-7, -4, 2, 3);
+                    ctx.fillRect(6, -4, 2, 3);
+                    // 칼 (오른쪽)
+                    ctx.save();
+                    ctx.translate(20, -2);
+                    ctx.rotate(0.3 + sway * 0.05);
+                    // 칼날
+                    ctx.fillStyle = '#E0E0E0';
+                    ctx.beginPath();
+                    ctx.moveTo(-2, 0); ctx.lineTo(0, -28); ctx.lineTo(2, 0);
+                    ctx.fill();
+                    ctx.strokeStyle = '#B0B0B0'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -26); ctx.stroke();
+                    // 칼 손잡이
+                    ctx.fillStyle = '#5D4037';
+                    ctx.fillRect(-3, 0, 6, 8);
+                    // 칼 가드
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillRect(-5, -1, 10, 3);
+                    ctx.restore();
+                    // 점프 시 검기 이펙트
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.5;
+                        for (let i = 0; i < 5; i++) {
+                            const a = frameIndex * 0.15 + i * 1.26;
+                            const r = 28 + Math.sin(a) * 6;
+                            ctx.strokeStyle = i % 2 === 0 ? '#FFD700' : '#FF5252';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.moveTo(Math.cos(a) * (r - 6), Math.sin(a) * (r - 6));
+                            ctx.lineTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
+                            ctx.stroke();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 100000000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 파도미 (파도 캐릭터 - 화면 전체 장애물 제거 능력)
             const padomi = {
                 name: '파도미', colors: { main: '#29B6F6', secondary: '#0288D1' }, size: 64,
@@ -1197,9 +1280,9 @@
             };
 
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '농구미', '비행미', '파도미', '악마', '천사', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '농구미', '비행미', '파도미', '무사', '악마', '천사', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '무사': musa, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -1274,6 +1357,7 @@
             '농구미': { name: '슬램덩크', desc: '코인3배 + 점프력 UP', type: 'basketball', coinMulti: 3, jumpBoost: -20 },
             '비행미': { name: '비행 모드', desc: '10초 비행+코인2배 (50회)', type: 'flight', charges: 50, flightDuration: 10, coinMulti: 2 },
             '파도미': { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
+            '무사': { name: '무적의 검', desc: '버섯 외 모든 면역 + 코인10배', type: 'warrior', coinMulti: 10 },
             '악마': { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
             '천사': { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
             '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
@@ -1292,6 +1376,8 @@
                     multiplier = ability.coinMulti; // 비행미: 항상 2배
                 } else if (ability.type === 'basketball') {
                     multiplier = ability.coinMulti; // 농구미: 항상 3배
+                } else if (ability.type === 'warrior') {
+                    multiplier = ability.coinMulti; // 무사: 항상 10배
                 } else if (ability.type === 'summerCoin') {
                     const season = getCurrentSeason(gameState.score || 0);
                     if (season === 'summer') multiplier = ability.coinMulti; // 김여름: 여름에만 3배
@@ -3366,7 +3452,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.10.9', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.11.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4399,6 +4485,18 @@
                                 return; // 데미지 무시
                             }
 
+                            // 무사 능력: 버섯 외 모든 장애물/악당 면역
+                            if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'warrior' &&
+                                obstacle.type !== 'mushroom') {
+                                gameState.invulnTimer = 0.3;
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#B71C1C', 16);
+                                this.particles.createExplosion(obstacle.x, obstacle.y, '#FFD700', 12);
+                                this.obstacles = this.obstacles.filter(o => o !== obstacle);
+                                if (obstacle.type.startsWith('villain-')) addCoins(5);
+                                audioManager.playCoinSound();
+                                return; // 데미지 무시
+                            }
+
                             // 악당은 목숨 2개, 일반 장애물은 1개
                             const isVillain = obstacle.type.startsWith('villain-');
                             const damage = isVillain ? 2 : 1;
@@ -4604,6 +4702,13 @@
                     ctx.font = 'bold 14px Arial';
                     ctx.textAlign = 'left';
                     ctx.fillText('😈 악당 면역!', 15, 135);
+                }
+                // 무사 HUD
+                if (abilityType === 'warrior') {
+                    ctx.fillStyle = '#B71C1C';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('⚔️ 무적의 검! 코인10배!', 15, 135);
                 }
                 // 천사 축복 HUD
                 if (abilityType === 'angelBlessing') {
@@ -5706,7 +5811,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.10.9';
+        const GAME_VERSION = 'v3.11.0';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
