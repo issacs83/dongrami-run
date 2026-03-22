@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.10.3';
+        var CURRENT_VER = 'v3.10.4';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1861,7 +1861,7 @@
                 const sc = gameState.score || 0;
                 let hellBoost = 1 + wc * 0.2;
                 // ★ 500점부터 추가 속도 폭증
-                if (sc >= 500) hellBoost += 0.4 + (sc - 500) * 0.002; // 500=+0.4, 600=+0.6, 700=+0.8 ...
+                if (sc >= 500) hellBoost += 0.2 + (sc - 500) * 0.001; // 500=+0.2, 600=+0.3, 700=+0.4 ...
                 const sp = gameSpeed * hellBoost;
 
                 switch(this.type) {
@@ -3106,7 +3106,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.10.3', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.10.4', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3812,12 +3812,12 @@
                 // ★★★ 500점 극악 모드: 점수에 비례하여 속도 급상승 ★★★
                 const currentScore = gameState.score || 0;
                 if (currentScore >= 500) {
-                    // 500점 진입 시 +1.2, 이후 점수당 +0.008 추가 (완만한 상승)
+                    // 500점 진입 시 +0.8, 이후 아주 천천히 상승
                     const overScore = currentScore - 500;
-                    finalSpeed += 1.2 + overScore * 0.008; // 500=+1.2, 600=+2.0, 700=+2.8 ...
+                    finalSpeed += 0.8 + overScore * 0.005; // 500=+0.8, 600=+1.3, 700=+1.8 ...
                 }
 
-                gameState.gameSpeed = Math.min(16, finalSpeed); // 최대 16
+                gameState.gameSpeed = Math.min(14, finalSpeed); // 최대 14
                 // 천사 능력: 속도 부스트 (15% 빠르게)
                 const angelAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
                 if (angelAbility?.type === 'angelBlessing' && angelAbility.speedBoost) {
@@ -3840,14 +3840,14 @@
                     const sc = gameState.score || 0;
 
                     if (sc >= 500) {
-                        // ★★★ 500점 극악 모드: 긴장감 있지만 플레이 가능 ★★★
-                        const fury = Math.min(3, (sc - 500) / 300); // 천천히 단계 상승
-                        const spMin = Math.max(0.3, 0.55 - fury * 0.08); // 시작 0.55초
-                        const spRange = Math.max(0.15, 0.3 - fury * 0.05);
+                        // ★★★ 500점 극악 모드: 쉬운 난이도 ★★★
+                        const fury = Math.min(3, (sc - 500) / 400); // 매우 천천히 상승
+                        const spMin = Math.max(0.4, 0.7 - fury * 0.1); // 시작 0.7초
+                        const spRange = Math.max(0.2, 0.4 - fury * 0.07);
                         this.obstacleTimer = spMin + Math.random() * spRange;
-                        // 35% 확률 동시 2개
-                        if (Math.random() < 0.35) {
-                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 180);
+                        // 20% 확률 동시 2개
+                        if (Math.random() < 0.2) {
+                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
                         }
                     } else {
                         // 일반 모드: 순환 기반 난이도
@@ -3964,7 +3964,7 @@
                 // ★★★ 500점 극악 모드: 악당 가중치 폭증 ★★★
                 let villainWeight;
                 if (sc >= 500) {
-                    villainWeight = Math.min(8, 3 + Math.floor((sc - 500) / 150)); // 500=3, 650=4, 800=5 ...
+                    villainWeight = Math.min(6, 2 + Math.floor((sc - 500) / 200)); // 500=2, 700=3, 900=4 ...
                 } else {
                     villainWeight = Math.min(8, 1 + wc);
                 }
@@ -5204,7 +5204,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.10.3';
+        const GAME_VERSION = 'v3.10.4';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
