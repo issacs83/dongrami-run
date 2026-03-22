@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.10.7';
+        var CURRENT_VER = 'v3.10.8';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -800,6 +800,76 @@
                 cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 농구미 (농구공 캐릭터 - 높은 점프 + 코인3배)
+            const nonggoomi = {
+                name: '농구미', colors: { main: '#FF6F00', secondary: '#E65100' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const bounce = isJumping ? Math.sin(frameIndex * 0.2) * 3 : 0;
+                    const spin = isJumping ? frameIndex * 0.08 : 0;
+                    ctx.rotate(spin);
+                    // 그림자
+                    if (!isJumping) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                        ctx.beginPath(); ctx.ellipse(0, 24, 18, 5, 0, 0, Math.PI * 2); ctx.fill();
+                    }
+                    // 농구공 몸체
+                    const ballGrad = ctx.createRadialGradient(-6, -8, 4, 0, 0, 24);
+                    ballGrad.addColorStop(0, '#FFB74D');
+                    ballGrad.addColorStop(0.3, '#FF9800');
+                    ballGrad.addColorStop(0.7, '#F57C00');
+                    ballGrad.addColorStop(1, '#E65100');
+                    ctx.fillStyle = ballGrad;
+                    ctx.beginPath(); ctx.arc(0, bounce, 22, 0, Math.PI * 2); ctx.fill();
+                    // 농구공 줄무늬 (세로)
+                    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(0, -22 + bounce); ctx.lineTo(0, 22 + bounce); ctx.stroke();
+                    // 농구공 줄무늬 (가로)
+                    ctx.beginPath(); ctx.moveTo(-22, bounce); ctx.lineTo(22, bounce); ctx.stroke();
+                    // 농구공 줄무늬 (곡선 좌)
+                    ctx.beginPath();
+                    ctx.moveTo(-8, -22 + bounce);
+                    ctx.quadraticCurveTo(-20, bounce, -8, 22 + bounce);
+                    ctx.stroke();
+                    // 농구공 줄무늬 (곡선 우)
+                    ctx.beginPath();
+                    ctx.moveTo(8, -22 + bounce);
+                    ctx.quadraticCurveTo(20, bounce, 8, 22 + bounce);
+                    ctx.stroke();
+                    // 하이라이트 반사
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.beginPath(); ctx.arc(-8, -10 + bounce, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                    ctx.beginPath(); ctx.arc(-5, -6 + bounce, 4, 0, Math.PI * 2); ctx.fill();
+                    // 눈 (귀여운 표정)
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, -2 + bounce, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -2 + bounce, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#3E2723';
+                    ctx.beginPath(); ctx.arc(-6, -1 + bounce, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(10, -1 + bounce, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-7, -3 + bounce, 1.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -3 + bounce, 1.2, 0, Math.PI * 2); ctx.fill();
+                    // 웃는 입
+                    ctx.strokeStyle = '#3E2723'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.arc(1, 8 + bounce, 7, 0.15, Math.PI - 0.15); ctx.stroke();
+                    // 점프 시 바운스 이펙트
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.4;
+                        ctx.fillStyle = '#FFB74D';
+                        for (let i = 0; i < 4; i++) {
+                            const ty = 26 + i * 6;
+                            const s = 3 - i * 0.6;
+                            ctx.beginPath(); ctx.arc(0, ty, s, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 비행미 (비행 캐릭터 - 10초 비행 능력)
             const bihaengmi = {
                 name: '비행미', colors: { main: '#AB47BC', secondary: '#7B1FA2' }, size: 64,
@@ -1127,9 +1197,9 @@
             };
 
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '비행미', '파도미', '악마', '천사', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '농구미', '비행미', '파도미', '악마', '천사', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '비행미': bihaengmi, '파도미': padomi, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -1192,6 +1262,7 @@
             '김여름': { name: '여름의 열기', desc: '여름 코인자동+코인3배', type: 'summerCoin', coinMulti: 3 },
             '동그라미하준': { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
             '가스미': { name: '방귀 부스터', desc: '독가스+코인2배 (100회)', type: 'fartBoost', charges: 100, coinMulti: 2 },
+            '농구미': { name: '슬램덩크', desc: '코인3배 + 점프력 UP', type: 'basketball', coinMulti: 3, jumpBoost: -20 },
             '비행미': { name: '비행 모드', desc: '10초 비행+코인2배 (50회)', type: 'flight', charges: 50, flightDuration: 10, coinMulti: 2 },
             '파도미': { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
             '악마': { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
@@ -1210,6 +1281,8 @@
                     multiplier = ability.coinMulti; // 가스미: 항상 2배
                 } else if (ability.type === 'flight') {
                     multiplier = ability.coinMulti; // 비행미: 항상 2배
+                } else if (ability.type === 'basketball') {
+                    multiplier = ability.coinMulti; // 농구미: 항상 3배
                 } else if (ability.type === 'summerCoin') {
                     const season = getCurrentSeason(gameState.score || 0);
                     if (season === 'summer') multiplier = ability.coinMulti; // 김여름: 여름에만 3배
@@ -1830,14 +1903,17 @@
             }
 
             update(inputState, deltaTime) {
+                // 캐릭터별 점프력 (농구미: jumpBoost 적용)
+                const charAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                const jumpPwr = GAME_CONFIG.jumpPower + (charAbility?.jumpBoost || 0);
                 // Jump
                 if (inputState.jumping && !this.isJumping && !this.isDucking) {
-                    this.velocityY = GAME_CONFIG.jumpPower;
+                    this.velocityY = jumpPwr;
                     this.isJumping = true;
                     this.doubleJumpAvailable = true;
                     audioManager.playJumpSound();
                 } else if (inputState.jumping && this.doubleJumpAvailable && this.isJumping) {
-                    this.velocityY = GAME_CONFIG.jumpPower;
+                    this.velocityY = jumpPwr;
                     this.doubleJumpAvailable = false;
                     audioManager.playJumpSound();
                     // 별미 능력: 더블점프 시 코인+1
@@ -3273,7 +3349,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.10.7', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.10.8', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -5613,7 +5689,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.10.7';
+        const GAME_VERSION = 'v3.10.8';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
