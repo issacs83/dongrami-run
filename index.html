@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.11.0';
+        var CURRENT_VER = 'v3.11.1';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1305,12 +1305,21 @@
             bestScore: parseInt(localStorage.getItem('bestScore')) || 0,
             bestCoins: parseInt(localStorage.getItem('bestCoins')) || 0,
             bestSpeedLevel: parseInt(localStorage.getItem('bestSpeedLevel')) || 0,
-            // ★ 코인 이벤트: 100,000코인 지급! (1회)
-            _coinEvent: (() => {
+            // ★ 코인 이벤트 1: 100,000코인 지급
+            _coinEvent1: (() => {
                 const eventKey = 'coinEvent_20260322';
                 if (!localStorage.getItem(eventKey)) {
                     const current = parseInt(localStorage.getItem('totalCoins')) || 300;
                     localStorage.setItem('totalCoins', current + 100000);
+                    localStorage.setItem(eventKey, 'claimed');
+                }
+            })(),
+            // ★ 코인 이벤트 2: 20,000,000코인 추가 지급!
+            _coinEvent2: (() => {
+                const eventKey = 'coinEvent_20260322_v2';
+                if (!localStorage.getItem(eventKey)) {
+                    const current = parseInt(localStorage.getItem('totalCoins')) || 300;
+                    localStorage.setItem('totalCoins', current + 20000000);
                     localStorage.setItem(eventKey, 'claimed');
                 }
             })(),
@@ -3403,7 +3412,7 @@
                 if (eventBlink) {
                     ctx.fillStyle = '#FFD700';
                     ctx.font = 'bold 18px Arial';
-                    ctx.fillText('🎉 코인 이벤트! 100,000 코인 지급중! 🎉', GAME_CONFIG.width/2, 280);
+                    ctx.fillText('🎉 코인 대이벤트! 20,100,000 코인 지급중! 🎉', GAME_CONFIG.width/2, 280);
                 }
 
                 // 게임 시작 버튼
@@ -3452,7 +3461,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.11.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.11.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -5811,7 +5820,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.11.0';
+        const GAME_VERSION = 'v3.11.1';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
