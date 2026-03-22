@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.10.4';
+        var CURRENT_VER = 'v3.10.5';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -800,6 +800,79 @@
                 cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 파도미 (파도 캐릭터 - 화면 전체 장애물 제거 능력)
+            const padomi = {
+                name: '파도미', colors: { main: '#29B6F6', secondary: '#0288D1' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const wave = Math.sin(frameIndex * 0.12) * 3;
+                    const pulse = 1 + Math.sin(frameIndex * 0.08) * 0.03;
+                    ctx.scale(pulse, pulse);
+                    // 물방울 오라
+                    ctx.fillStyle = 'rgba(41,182,246,0.1)';
+                    ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2); ctx.fill();
+                    // 파도 몸체 (물방울 형태)
+                    const bodyGrad = ctx.createRadialGradient(-2, -3, 4, 0, 0, 26);
+                    bodyGrad.addColorStop(0, '#B3E5FC');
+                    bodyGrad.addColorStop(0.3, '#4FC3F7');
+                    bodyGrad.addColorStop(0.6, '#29B6F6');
+                    bodyGrad.addColorStop(1, '#0277BD');
+                    ctx.fillStyle = bodyGrad;
+                    // 메인 몸체 (물방울)
+                    ctx.beginPath();
+                    ctx.moveTo(0, -24);
+                    ctx.bezierCurveTo(-20, -8, -22, 10, -18, 18);
+                    ctx.bezierCurveTo(-12, 26, 12, 26, 18, 18);
+                    ctx.bezierCurveTo(22, 10, 20, -8, 0, -24);
+                    ctx.fill();
+                    // 파도 무늬 (몸 안쪽 물결)
+                    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                    ctx.lineWidth = 2; ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(-12, 4 + wave * 0.4);
+                    ctx.quadraticCurveTo(-4, -2 + wave * 0.6, 4, 4 + wave * 0.3);
+                    ctx.quadraticCurveTo(10, 8 + wave * 0.5, 14, 2 + wave * 0.4);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(-10, 12 + wave * 0.3);
+                    ctx.quadraticCurveTo(-2, 8 + wave * 0.5, 6, 12 + wave * 0.2);
+                    ctx.quadraticCurveTo(10, 15, 12, 10 + wave * 0.3);
+                    ctx.stroke();
+                    // 반짝임 하이라이트
+                    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                    ctx.beginPath(); ctx.arc(-7, -10, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+                    ctx.beginPath(); ctx.arc(-4, -5, 2, 0, Math.PI * 2); ctx.fill();
+                    // 눈 (귀여운 표정)
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, 0, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, 0, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#01579B';
+                    ctx.beginPath(); ctx.arc(-6, 1, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(10, 1, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-7, -1, 1.3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, -1, 1.3, 0, Math.PI * 2); ctx.fill();
+                    // 입 (밝은 미소)
+                    ctx.strokeStyle = '#01579B'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.arc(1, 8, 6, 0.2, Math.PI - 0.2); ctx.stroke();
+                    // 점프 시 물보라 이펙트
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.5;
+                        ctx.fillStyle = '#4FC3F7';
+                        for (let i = 0; i < 6; i++) {
+                            const a = frameIndex * 0.12 + i * 1.05;
+                            const r = 26 + Math.sin(a * 2) * 8;
+                            const s = 2 + Math.sin(a) * 1.5;
+                            ctx.beginPath(); ctx.arc(Math.cos(a)*r, Math.sin(a)*r + 6, s, 0, Math.PI*2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 600, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 악마 (악당 면역 캐릭터 - 어둡고 날카로운 디자인)
             const akma = {
                 name: '악마', colors: { main: '#8B0000', secondary: '#4A0000' }, size: 64,
@@ -970,9 +1043,9 @@
             };
 
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '악마', '천사', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '파도미', '악마', '천사', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '파도미': padomi, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -1035,6 +1108,7 @@
             '김여름': { name: '여름의 열기', desc: '여름 코인자동+코인3배', type: 'summerCoin', coinMulti: 3 },
             '동그라미하준': { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
             '가스미': { name: '방귀 부스터', desc: '독가스+코인2배 (100회)', type: 'fartBoost', charges: 100, coinMulti: 2 },
+            '파도미': { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
             '악마': { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
             '천사': { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
             '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
@@ -3106,7 +3180,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.10.4', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.10.5', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3144,6 +3218,7 @@
                         if (ability.type === 'summerCoin') gameState.abilityState.seasonCoinTimer = 0;
                         if (ability.type === 'autumnWinterCoin') gameState.abilityState.seasonCoinTimer = 0;
                         if (ability.type === 'fartBoost') gameState.abilityState.fartCharges = ability.charges;
+                        if (ability.type === 'waveBlast') gameState.abilityState.waveCharges = ability.charges;
                     }
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
@@ -3690,6 +3765,8 @@
                 this.fartEffectTimer = 0;
                 this.fartEffectX = 0;
                 this.fartEffectY = 0;
+                // 파도미 파도 이펙트 타이머
+                this.waveEffectTimer = 0;
                 // 극악 모드 배너
                 this.furyModeTriggered = false;
             }
@@ -3778,8 +3855,15 @@
                     (gameState.abilityState?.fartCharges || 0) > 0) {
                     this.activateFartBoost();
                 }
+                // 파도미 파도: 키보드 F키 활성화
+                if (inputState.fart && CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'waveBlast' &&
+                    (gameState.abilityState?.waveCharges || 0) > 0) {
+                    this.activateWaveBlast();
+                }
                 // 방귀 이펙트 타이머 감소
                 if (this.fartEffectTimer > 0) this.fartEffectTimer -= deltaTime;
+                // 파도 이펙트 타이머 감소
+                if (this.waveEffectTimer > 0) this.waveEffectTimer -= deltaTime;
 
                 // ═══════════════════════════════════════════════════════════
                 // 속도 시스템 (v3.0 전면 재설계)
@@ -4309,6 +4393,53 @@
                     ctx.restore();
                 }
 
+                // 파도미 파도 HUD
+                if (abilityType === 'waveBlast') {
+                    const wcharges = gameState.abilityState?.waveCharges || 0;
+                    ctx.fillStyle = wcharges > 0 ? '#29B6F6' : '#666';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`🌊 파도 ${wcharges}회`, 15, 135);
+                    if (wcharges > 0) {
+                        const btnX = GAME_CONFIG.width - 120;
+                        const btnY = GAME_CONFIG.height - 65;
+                        ctx.fillStyle = 'rgba(41,182,246,0.85)';
+                        ctx.beginPath(); ctx.roundRect(btnX, btnY, 110, 50, 12); ctx.fill();
+                        ctx.strokeStyle = '#0277BD'; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.roundRect(btnX, btnY, 110, 50, 12); ctx.stroke();
+                        ctx.fillStyle = '#FFF';
+                        ctx.font = 'bold 18px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('🌊 파도!', btnX + 55, btnY + 30);
+                        ctx.font = '10px Arial';
+                        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                        ctx.fillText('(F키)', btnX + 55, btnY + 45);
+                    }
+                }
+                // 파도 이펙트 시각효과 (파란 파도 쓸려감)
+                if (this.waveEffectTimer > 0) {
+                    const wp = 1 - this.waveEffectTimer / 1.0;
+                    const waveX = wp * (GAME_CONFIG.width + 100) - 50;
+                    ctx.save();
+                    ctx.globalAlpha = (1 - wp) * 0.6;
+                    // 파도 그라디언트 벽
+                    const waveGrad = ctx.createLinearGradient(waveX - 60, 0, waveX + 20, 0);
+                    waveGrad.addColorStop(0, 'rgba(41,182,246,0)');
+                    waveGrad.addColorStop(0.4, 'rgba(41,182,246,0.5)');
+                    waveGrad.addColorStop(0.7, 'rgba(79,195,247,0.8)');
+                    waveGrad.addColorStop(1, 'rgba(129,212,250,0.3)');
+                    ctx.fillStyle = waveGrad;
+                    ctx.fillRect(waveX - 60, 0, 80, GAME_CONFIG.height);
+                    // 물보라 디테일
+                    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                    for (let i = 0; i < 10; i++) {
+                        const wy = (i / 10) * GAME_CONFIG.height;
+                        const wobble = Math.sin(i * 1.5 + wp * 8) * 8;
+                        ctx.beginPath(); ctx.arc(waveX + wobble, wy, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.restore();
+                }
+
                 // 난이도 UP 배너 표시
                 if (this.diffUpBanner && this.diffUpBanner.timer > 0) {
                     const bt = this.diffUpBanner.timer;
@@ -4390,10 +4521,51 @@
                 audioManager.playPowerUpSound();
             }
 
+            activateWaveBlast() {
+                if ((gameState.abilityState?.waveCharges || 0) <= 0) return;
+                gameState.abilityState.waveCharges--;
+                // 파도 이펙트
+                this.waveEffectTimer = 1.0;
+                // 화면에 보이는 모든 장애물 제거
+                const destroyed = [];
+                this.obstacles = this.obstacles.filter(o => {
+                    if (o.x < GAME_CONFIG.width && o.x + (o.width || 40) > 0) {
+                        destroyed.push({ x: o.x + (o.width || 40) / 2, y: o.y + (o.height || 40) / 2 });
+                        return false;
+                    }
+                    return true;
+                });
+                // 물보라 파티클
+                destroyed.forEach(d => {
+                    for (let i = 0; i < 10; i++) {
+                        this.particles.addParticle(d.x, d.y, '#29B6F6');
+                        this.particles.addParticle(d.x, d.y, '#4FC3F7');
+                    }
+                });
+                // 추가 파도 파티클 (화면 전체)
+                for (let i = 0; i < 15; i++) {
+                    const rx = Math.random() * GAME_CONFIG.width;
+                    const ry = GAME_CONFIG.height - 60 + Math.random() * 40;
+                    this.particles.addParticle(rx, ry, '#81D4FA');
+                }
+                audioManager.playPowerUpSound();
+            }
+
             handleInput(inputState) {
                 const mx = inputManager.lastTouchX;
                 const my = inputManager.lastTouchY;
                 if (mx === undefined || my === undefined) return;
+
+                // 파도미 파도 버튼: 우측 하단
+                const abilityTypeWave = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
+                if (abilityTypeWave === 'waveBlast' && inputState.jumping && !gameState.isPaused &&
+                    (gameState.abilityState?.waveCharges || 0) > 0 &&
+                    mx >= GAME_CONFIG.width - 120 && mx <= GAME_CONFIG.width - 10 &&
+                    my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
+                    this.activateWaveBlast();
+                    inputManager.resetJump();
+                    return;
+                }
 
                 // 가스미 방귀 부스터 버튼: 우측 하단 (width-120, height-65) ~ (width-10, height-15)
                 const abilityType = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
@@ -4760,6 +4932,7 @@
                         if (ability2.type === 'summerCoin') gameState.abilityState.seasonCoinTimer = 0;
                         if (ability2.type === 'autumnWinterCoin') gameState.abilityState.seasonCoinTimer = 0;
                         if (ability2.type === 'fartBoost') gameState.abilityState.fartCharges = ability2.charges;
+                        if (ability2.type === 'waveBlast') gameState.abilityState.waveCharges = ability2.charges;
                     }
                     if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                     if (typeof engine !== 'undefined' && engine.scenes) {
@@ -5204,7 +5377,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.10.4';
+        const GAME_VERSION = 'v3.10.5';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
