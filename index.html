@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.11.4';
+        var CURRENT_VER = 'v3.11.5';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -800,6 +800,86 @@
                 cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 냠냠미 (먹보 캐릭터 - 장애물 60회 먹기 + 코인2배)
+            const nyamnyammi = {
+                name: '냠냠미', colors: { main: '#FF8F00', secondary: '#E65100' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const chew = Math.sin(frameIndex * 0.2) * 2;
+                    const isEating = gameState.abilityState?.eatEffectTimer > 0;
+                    // 먹보 오라
+                    if (isEating) {
+                        ctx.fillStyle = 'rgba(255,143,0,0.2)';
+                        ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2); ctx.fill();
+                    }
+                    // 둥근 몸체 (빵빵한 느낌)
+                    const bodyGrad = ctx.createRadialGradient(-3, -4, 4, 0, 0, 24);
+                    bodyGrad.addColorStop(0, '#FFCC80');
+                    bodyGrad.addColorStop(0.3, '#FFB74D');
+                    bodyGrad.addColorStop(0.6, '#FFA726');
+                    bodyGrad.addColorStop(1, '#F57C00');
+                    ctx.fillStyle = bodyGrad;
+                    ctx.beginPath(); ctx.arc(0, 2, 23, 0, Math.PI * 2); ctx.fill();
+                    // 볼 (복숭아색 블러셔)
+                    ctx.fillStyle = 'rgba(255,138,128,0.5)';
+                    ctx.beginPath(); ctx.arc(-14, 6, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(14, 6, 6, 0, Math.PI * 2); ctx.fill();
+                    // 눈 (행복한 먹보 눈)
+                    if (isEating) {
+                        // 먹는 중: > < 눈
+                        ctx.strokeStyle = '#5D4037'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.moveTo(-12, -5); ctx.lineTo(-7, -2); ctx.lineTo(-12, 1); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(12, -5); ctx.lineTo(7, -2); ctx.lineTo(12, 1); ctx.stroke();
+                    } else {
+                        // 평소: 반달 눈 (행복)
+                        ctx.fillStyle = '#5D4037';
+                        ctx.beginPath(); ctx.arc(-8, -2, 5, Math.PI, 0); ctx.fill();
+                        ctx.beginPath(); ctx.arc(8, -2, 5, Math.PI, 0); ctx.fill();
+                    }
+                    // 입
+                    if (isEating) {
+                        // 먹는 중: 큰 벌린 입 + 먹는 애니메이션
+                        const mouthOpen = 8 + Math.abs(chew) * 2;
+                        ctx.fillStyle = '#D32F2F';
+                        ctx.beginPath(); ctx.arc(0, 10, mouthOpen, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#B71C1C';
+                        ctx.beginPath(); ctx.arc(0, 10, mouthOpen * 0.5, 0, Math.PI * 2); ctx.fill();
+                        // 이빨
+                        ctx.fillStyle = '#FFF';
+                        ctx.fillRect(-5, 10 - mouthOpen + 1, 4, 3);
+                        ctx.fillRect(1, 10 - mouthOpen + 1, 4, 3);
+                        // 음식 파티클
+                        ctx.globalAlpha = 0.7;
+                        const colors = ['#FF5722', '#8BC34A', '#FFEB3B', '#FF9800'];
+                        for (let i = 0; i < 4; i++) {
+                            const a = frameIndex * 0.3 + i * 1.57;
+                            const r = 16 + Math.sin(a) * 5;
+                            ctx.fillStyle = colors[i];
+                            ctx.beginPath(); ctx.arc(Math.cos(a) * r, 10 + Math.sin(a) * r * 0.5, 2.5, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    } else {
+                        // 평소: 행복한 미소 + 혀
+                        ctx.fillStyle = '#D32F2F';
+                        ctx.beginPath(); ctx.arc(0, 10, 7 + chew * 0.3, 0, Math.PI); ctx.fill();
+                        ctx.fillStyle = '#EF5350';
+                        ctx.beginPath(); ctx.ellipse(2, 13, 3, 2, 0.2, 0, Math.PI * 2); ctx.fill();
+                    }
+                    // 점프 시 침 이펙트
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.4;
+                        ctx.fillStyle = '#FFCC80';
+                        for (let i = 0; i < 3; i++) {
+                            const ty = 24 + i * 5;
+                            ctx.beginPath(); ctx.arc(Math.sin(frameIndex * 0.2 + i) * 4, ty, 2, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 농구미 (농구공 캐릭터 - 높은 점프 + 코인3배)
             const nonggoomi = {
                 name: '농구미', colors: { main: '#FF6F00', secondary: '#E65100' }, size: 64,
@@ -1280,9 +1360,9 @@
             };
 
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '농구미', '비행미', '파도미', '무사', '악마', '천사', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '농구미', '비행미', '파도미', '무사', '악마', '천사', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '무사': musa, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '무사': musa, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -1390,6 +1470,7 @@
             '김여름': { name: '여름의 열기', desc: '여름 코인자동+코인3배', type: 'summerCoin', coinMulti: 3 },
             '동그라미하준': { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
             '가스미': { name: '방귀 부스터', desc: '독가스+코인2배 (100회)', type: 'fartBoost', charges: 100, coinMulti: 2 },
+            '냠냠미': { name: '먹보', desc: '장애물 냠냠 (60회) + 코인2배', type: 'eatObstacle', charges: 60, coinMulti: 2 },
             '농구미': { name: '슬램덩크', desc: '코인3배 + 점프력 UP', type: 'basketball', coinMulti: 3, jumpBoost: -20 },
             '비행미': { name: '비행 모드', desc: '10초 비행+코인2배 (50회)', type: 'flight', charges: 50, flightDuration: 10, coinMulti: 2 },
             '파도미': { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
@@ -1410,6 +1491,8 @@
                     multiplier = ability.coinMulti; // 가스미: 항상 2배
                 } else if (ability.type === 'flight') {
                     multiplier = ability.coinMulti; // 비행미: 항상 2배
+                } else if (ability.type === 'eatObstacle') {
+                    multiplier = ability.coinMulti; // 냠냠미: 항상 2배
                 } else if (ability.type === 'basketball') {
                     multiplier = ability.coinMulti; // 농구미: 항상 3배
                 } else if (ability.type === 'warrior') {
@@ -3488,7 +3571,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.11.4', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.11.5', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -3528,6 +3611,7 @@
                         if (ability.type === 'fartBoost') gameState.abilityState.fartCharges = ability.charges;
                         if (ability.type === 'waveBlast') gameState.abilityState.waveCharges = ability.charges;
                         if (ability.type === 'flight') { gameState.abilityState.flightCharges = ability.charges; gameState.abilityState.flyingTimer = 0; }
+                        if (ability.type === 'eatObstacle') { gameState.abilityState.eatCharges = ability.charges; gameState.abilityState.eatEffectTimer = 0; }
                     }
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
@@ -4208,6 +4292,8 @@
                 if (this.fartEffectTimer > 0) this.fartEffectTimer -= deltaTime;
                 // 파도 이펙트 타이머 감소
                 if (this.waveEffectTimer > 0) this.waveEffectTimer -= deltaTime;
+                // 냠냠미 먹기 이펙트 타이머 감소
+                if (gameState.abilityState?.eatEffectTimer > 0) gameState.abilityState.eatEffectTimer -= deltaTime;
 
                 // ═══════════════════════════════════════════════════════════
                 // 속도 시스템 (v3.0 전면 재설계)
@@ -4529,6 +4615,23 @@
                                 this.particles.createExplosion(obstacle.x, obstacle.y, '#FFD700', 12);
                                 this.obstacles = this.obstacles.filter(o => o !== obstacle);
                                 if (obstacle.type.startsWith('villain-')) addCoins(5);
+                                audioManager.playCoinSound();
+                                return; // 데미지 무시
+                            }
+
+                            // 냠냠미 능력: 장애물 먹기 (60회)
+                            if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'eatObstacle' &&
+                                (gameState.abilityState?.eatCharges || 0) > 0) {
+                                gameState.abilityState.eatCharges--;
+                                gameState.abilityState.eatEffectTimer = 0.6; // 먹는 표정 타이머
+                                gameState.invulnTimer = 0.3;
+                                // 냠냠 이펙트: 음식 파티클 + 별 이펙트
+                                const eatColors = ['#FF5722', '#8BC34A', '#FFEB3B', '#FF9800', '#E91E63'];
+                                eatColors.forEach(c => {
+                                    this.particles.createExplosion(obstacle.x, obstacle.y, c, 4);
+                                });
+                                this.obstacles = this.obstacles.filter(o => o !== obstacle);
+                                addCoins(1); // 먹으면 코인 보너스
                                 audioManager.playCoinSound();
                                 return; // 데미지 무시
                             }
@@ -4860,6 +4963,14 @@
                         ctx.fillStyle = 'rgba(255,255,255,0.7)';
                         ctx.fillText('(F키)', btnX + 55, btnY + 45);
                     }
+                }
+                // 냠냠미 먹기 HUD
+                if (abilityType === 'eatObstacle') {
+                    const echarges = gameState.abilityState?.eatCharges || 0;
+                    ctx.fillStyle = echarges > 0 ? '#FF8F00' : '#666';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`🍴 냠냠 ${echarges}회`, 15, 135);
                 }
                 // 파도 이펙트 시각효과 (파란 파도 쓸려감)
                 if (this.waveEffectTimer > 0) {
@@ -5403,6 +5514,7 @@
                         if (ability2.type === 'fartBoost') gameState.abilityState.fartCharges = ability2.charges;
                         if (ability2.type === 'waveBlast') gameState.abilityState.waveCharges = ability2.charges;
                         if (ability2.type === 'flight') { gameState.abilityState.flightCharges = ability2.charges; gameState.abilityState.flyingTimer = 0; }
+                        if (ability2.type === 'eatObstacle') { gameState.abilityState.eatCharges = ability2.charges; gameState.abilityState.eatEffectTimer = 0; }
                     }
                     if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                     if (typeof engine !== 'undefined' && engine.scenes) {
@@ -5847,7 +5959,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.11.4';
+        const GAME_VERSION = 'v3.11.5';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
