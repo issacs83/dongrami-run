@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.11.5';
+        var CURRENT_VER = 'v3.11.6';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -39,7 +39,34 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="동그라미 런">
     <meta name="theme-color" content="#87ceeb">
-    <meta name="description" content="동그라미 런! 귀여운 캐릭터로 달리고, 점프하고, 장애물을 피하세요! 봄여름가을겨울 계절이 바뀌는 무한 러너 게임">
+    <meta name="description" content="동그라미 런! 귀여운 캐릭터 16종으로 달리고, 점프하고, 장애물을 피하세요! 봄여름가을겨울 계절이 바뀌는 무한 러너 게임. 브라우저에서 바로 플레이!">
+    <meta name="keywords" content="동그라미런, 동그라미 런, dongrami run, 무한 러너, 런닝 게임, 브라우저 게임, HTML5 게임, 모바일 게임, 아이패드 게임, 무료 게임, 캐주얼 게임, 점프 게임, endless runner, free game">
+    <meta name="author" content="issacs83">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://issacs83.github.io/dongrami-run/">
+    <!-- 구조화 데이터 (Google 검색 리치 결과) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoGame",
+      "name": "동그라미 런 - Dongrami Run",
+      "description": "귀여운 캐릭터 16종으로 달리고, 점프하고, 장애물을 피하세요! 봄여름가을겨울 계절이 바뀌는 무한 러너 게임.",
+      "url": "https://issacs83.github.io/dongrami-run/",
+      "image": "https://issacs83.github.io/dongrami-run/og-image.png",
+      "genre": ["Endless Runner", "Casual", "Arcade"],
+      "gamePlatform": ["Web Browser", "Mobile", "iPad"],
+      "applicationCategory": "Game",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "KRW"
+      },
+      "inLanguage": "ko",
+      "playMode": "SinglePlayer",
+      "numberOfPlayers": { "@type": "QuantitativeValue", "value": 1 }
+    }
+    </script>
     <!-- Open Graph (카카오톡, SNS 공유 미리보기) -->
     <meta property="og:title" content="동그라미 런 🏃‍♂️">
     <meta property="og:description" content="귀여운 캐릭터로 달리는 무한 러너 게임! 친구랑 점수 대결하자!">
@@ -155,7 +182,7 @@
     <div id="rotateOverlay">
         <div class="play-btn">▶</div>
         <div class="text">터치하여 게임 시작!</div>
-        <div class="sub">자동으로 가로 화면으로 전환됩니다</div>
+        <div class="sub">가로 모드로 플레이하면 더 좋아요!</div>
     </div>
 
     <div id="gameContainer">
@@ -1034,7 +1061,7 @@
                 cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
-            // 무사 (최강 캐릭터 - 버섯 외 모든 데미지 면역 + 코인10배)
+            // 무사 (프리미엄 캐릭터 - 악당/벌/눈사람 면역 + 코인10배, 버섯/선인장/바위는 데미지)
             const musa = {
                 name: '무사', colors: { main: '#B71C1C', secondary: '#4A148C' }, size: 64,
                 drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
@@ -1474,7 +1501,7 @@
             '농구미': { name: '슬램덩크', desc: '코인3배 + 점프력 UP', type: 'basketball', coinMulti: 3, jumpBoost: -20 },
             '비행미': { name: '비행 모드', desc: '10초 비행+코인2배 (50회)', type: 'flight', charges: 50, flightDuration: 10, coinMulti: 2 },
             '파도미': { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
-            '무사': { name: '무적의 검', desc: '버섯 외 모든 면역 + 코인10배', type: 'warrior', coinMulti: 10 },
+            '무사': { name: '무적의 검', desc: '악당/벌/눈사람 면역 + 코인10배 (버섯/선인장/바위는 데미지)', type: 'warrior', coinMulti: 10 },
             '악마': { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
             '천사': { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
             '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
@@ -3571,7 +3598,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.11.5', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.11.6', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4607,9 +4634,11 @@
                                 return; // 데미지 무시
                             }
 
-                            // 무사 능력: 버섯 외 모든 장애물/악당 면역
+                            // 무사 능력: 악당/새/벌/웅덩이/눈사람/그루터기 면역 (버섯/선인장/바위는 데미지)
                             if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'warrior' &&
-                                obstacle.type !== 'mushroom') {
+                                obstacle.type !== 'mushroom' &&
+                                !obstacle.type.startsWith('cactus') &&
+                                !obstacle.type.startsWith('rock')) {
                                 gameState.invulnTimer = 0.3;
                                 this.particles.createExplosion(obstacle.x, obstacle.y, '#B71C1C', 16);
                                 this.particles.createExplosion(obstacle.x, obstacle.y, '#FFD700', 12);
@@ -4847,7 +4876,7 @@
                     ctx.fillStyle = '#B71C1C';
                     ctx.font = 'bold 14px Arial';
                     ctx.textAlign = 'left';
-                    ctx.fillText('⚔️ 무적의 검! 코인10배!', 15, 135);
+                    ctx.fillText('⚔️ 코인10배! (버섯/선인장/바위 주의)', 15, 135);
                 }
                 // 천사 축복 HUD
                 if (abilityType === 'angelBlessing') {
@@ -5901,19 +5930,30 @@
         function enterFullscreenLandscape() {
             const docEl = document.documentElement;
             const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+
+            // 풀스크린 성공/실패 상관없이 오버레이 숨기고 게임 보여주기 (iPad Safari 대응)
+            function forceShowGame() {
+                document.getElementById('rotateOverlay').style.display = 'none';
+                document.getElementById('gameContainer').style.display = 'flex';
+                setTimeout(resizeCanvas, 300);
+            }
+
             if (requestFS) {
                 requestFS.call(docEl).then(() => {
-                    // 풀스크린 진입 성공 → 가로 잠금
                     if (screen.orientation && screen.orientation.lock) {
                         screen.orientation.lock('landscape').catch(() => {});
                     }
-                    setTimeout(resizeCanvas, 300);
+                    forceShowGame();
                 }).catch(() => {
-                    // 풀스크린 실패 시에도 가로 잠금 시도
+                    // 풀스크린 실패 (iPad Safari) → 그래도 게임 보여줌
                     if (screen.orientation && screen.orientation.lock) {
                         screen.orientation.lock('landscape').catch(() => {});
                     }
+                    forceShowGame();
                 });
+            } else {
+                // requestFullscreen 자체가 없는 브라우저 (iPad Safari) → 바로 게임 보여줌
+                forceShowGame();
             }
         }
 
@@ -5959,7 +5999,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.11.5';
+        const GAME_VERSION = 'v3.11.6';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크

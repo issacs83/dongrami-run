@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://issacs83.github.io/dongrami-run/sitemap.xml
