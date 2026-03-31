@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.11.8';
+        var CURRENT_VER = 'v3.12.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -907,32 +907,71 @@
                 cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
-            // 주주미 (미모 진화 캐릭터 - 장애물 80회 먹기 + 먹을수록 예뻐짐)
+            // 주주미 (미모 진화 캐릭터 - 장애물 80회 먹기 + 먹을수록 예뻐짐, 6단계)
             const jujumi = {
                 name: '주주미', colors: { main: '#FF80AB', secondary: '#F50057' }, size: 64,
                 drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
                     ctx.save(); ctx.translate(x + 32, y + 32);
                     const isEating = gameState.abilityState?.eatEffectTimer > 0;
-                    // 미모 레벨 계산 (먹을수록 예뻐짐: 80→0 = 레벨 0→4)
+                    // 미모 레벨 계산 (0~5, 14개마다 진화)
                     const maxCharges = 80;
                     const eaten = maxCharges - (gameState.abilityState?.eatCharges || 0);
-                    const beautyLevel = Math.min(4, Math.floor(eaten / 16)); // 0,1,2,3,4 (16개마다 진화)
+                    const beautyLevel = Math.min(5, Math.floor(eaten / 14));
+                    // 먹은 개수 기반 미세 진행도 (0.0~1.0, 레벨 내에서의 진행)
+                    const subProgress = (eaten % 14) / 14;
 
-                    // 미모 레벨별 색상
+                    // 미모 레벨별 색상 (6단계)
                     const bodyColors = [
-                        ['#FFCDD2', '#EF9A9A', '#E57373', '#D32F2F'], // Lv0: 연분홍 (수수한)
-                        ['#F8BBD0', '#F48FB1', '#EC407A', '#C2185B'], // Lv1: 핑크
-                        ['#E1BEE7', '#CE93D8', '#AB47BC', '#7B1FA2'], // Lv2: 보라
-                        ['#B3E5FC', '#81D4FA', '#29B6F6', '#0288D1'], // Lv3: 하늘
-                        ['#FFF9C4', '#FFF176', '#FFEE58', '#FFD600'], // Lv4: 골든 (최종 진화!)
+                        ['#FFCDD2', '#EF9A9A', '#E57373', '#D32F2F'], // Lv0: 수수한 (연분홍)
+                        ['#F8BBD0', '#F48FB1', '#EC407A', '#C2185B'], // Lv1: 귀여운 (핑크)
+                        ['#E1BEE7', '#CE93D8', '#AB47BC', '#7B1FA2'], // Lv2: 화사한 (보라)
+                        ['#B3E5FC', '#81D4FA', '#29B6F6', '#0288D1'], // Lv3: 빛나는 (하늘)
+                        ['#FFF9C4', '#FFF176', '#FFEE58', '#FFD600'], // Lv4: 여신 (골든)
+                        ['#F3E5F5', '#E1BEE7', '#CE93D8', '#9C27B0'], // Lv5: 아이돌 (홀로그램 보라)
                     ];
                     const bc = bodyColors[beautyLevel];
 
-                    // 최종 진화 오라
-                    if (beautyLevel >= 4) {
+                    // ═══ Lv5 아이돌: 스포트라이트 + 홀로그램 오라 ═══
+                    if (beautyLevel >= 5) {
+                        // 스포트라이트 (위에서 내려오는 빛)
+                        const spotGrad = ctx.createLinearGradient(0, -50, 0, 30);
+                        spotGrad.addColorStop(0, 'rgba(255,255,255,0.25)');
+                        spotGrad.addColorStop(0.5, 'rgba(206,147,216,0.12)');
+                        spotGrad.addColorStop(1, 'rgba(206,147,216,0)');
+                        ctx.fillStyle = spotGrad;
+                        ctx.beginPath();
+                        ctx.moveTo(-8, -50); ctx.lineTo(8, -50);
+                        ctx.lineTo(25, 30); ctx.lineTo(-25, 30);
+                        ctx.closePath(); ctx.fill();
+
+                        // 홀로그램 오라 (무지개빛 회전)
+                        const holoColors = ['#FF4081', '#E040FB', '#7C4DFF', '#448AFF', '#18FFFF', '#69F0AE', '#FFD740'];
+                        for (let i = 0; i < holoColors.length; i++) {
+                            const a = frameIndex * 0.03 + (i / holoColors.length) * Math.PI * 2;
+                            const r = 34 + Math.sin(frameIndex * 0.05 + i) * 3;
+                            ctx.globalAlpha = 0.2 + Math.sin(frameIndex * 0.04 + i * 0.9) * 0.1;
+                            ctx.strokeStyle = holoColors[i];
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, r, a, a + 0.9);
+                            ctx.stroke();
+                        }
+                        ctx.globalAlpha = 1;
+
+                        // 떨어지는 별가루
+                        for (let i = 0; i < 8; i++) {
+                            const sx = Math.sin(frameIndex * 0.04 + i * 1.1) * 28;
+                            const sy = ((frameIndex * 0.8 + i * 12) % 50) - 30;
+                            ctx.globalAlpha = 0.5 - sy * 0.01;
+                            ctx.fillStyle = holoColors[i % holoColors.length];
+                            ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    // Lv4 여신 오라
+                    else if (beautyLevel >= 4) {
                         ctx.fillStyle = 'rgba(255,215,0,0.15)';
                         ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.fill();
-                        // 반짝이는 별
                         ctx.fillStyle = '#FFD700';
                         for (let i = 0; i < 5; i++) {
                             const a = frameIndex * 0.05 + i * 1.26;
@@ -942,181 +981,238 @@
                         }
                         ctx.globalAlpha = 1;
                     }
-                    // 먹는 중 이펙트 (화려한 버전)
+
+                    // ═══ 먹는 중 이펙트 ═══
                     if (isEating) {
-                        // 1) 바깥 글로우 링 (미모 레벨에 따라 커짐)
-                        const glowSize = 36 + beautyLevel * 4;
-                        const glowAlpha = 0.15 + beautyLevel * 0.05;
+                        const glowSize = 36 + beautyLevel * 5;
+                        const glowAlpha = 0.15 + beautyLevel * 0.06;
                         const glowGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, glowSize);
-                        glowGrad.addColorStop(0, `rgba(255,128,171,${glowAlpha + 0.15})`);
-                        glowGrad.addColorStop(0.6, `rgba(255,64,129,${glowAlpha})`);
-                        glowGrad.addColorStop(1, 'rgba(255,64,129,0)');
+                        if (beautyLevel >= 5) {
+                            // 아이돌: 홀로그램 글로우
+                            glowGrad.addColorStop(0, `rgba(224,64,251,${glowAlpha + 0.2})`);
+                            glowGrad.addColorStop(0.4, `rgba(124,77,255,${glowAlpha})`);
+                            glowGrad.addColorStop(0.7, `rgba(68,138,255,${glowAlpha * 0.5})`);
+                            glowGrad.addColorStop(1, 'rgba(105,240,174,0)');
+                        } else {
+                            glowGrad.addColorStop(0, `rgba(255,128,171,${glowAlpha + 0.15})`);
+                            glowGrad.addColorStop(0.6, `rgba(255,64,129,${glowAlpha})`);
+                            glowGrad.addColorStop(1, 'rgba(255,64,129,0)');
+                        }
                         ctx.fillStyle = glowGrad;
                         ctx.beginPath(); ctx.arc(0, 0, glowSize, 0, Math.PI * 2); ctx.fill();
 
-                        // 2) 회전하는 반짝이 (레벨 1+)
+                        // 회전하는 반짝이 (레벨 1+)
                         if (beautyLevel >= 1) {
                             const sparkCount = 4 + beautyLevel * 2;
-                            const sparkColors = beautyLevel >= 4 ? ['#FFD700', '#FFC107', '#FFEE58'] : ['#FF80AB', '#FF4081', '#E040FB'];
+                            const sparkColors = beautyLevel >= 5 ? ['#E040FB', '#7C4DFF', '#448AFF', '#18FFFF', '#FFD740'] :
+                                                beautyLevel >= 4 ? ['#FFD700', '#FFC107', '#FFEE58'] : ['#FF80AB', '#FF4081', '#E040FB'];
                             for (let i = 0; i < sparkCount; i++) {
                                 const a = frameIndex * 0.08 + (i / sparkCount) * Math.PI * 2;
                                 const r = 28 + Math.sin(frameIndex * 0.15 + i) * 5;
                                 const sparkSize = 1.5 + Math.sin(frameIndex * 0.2 + i * 1.5) * 1;
                                 ctx.globalAlpha = 0.6 + Math.sin(frameIndex * 0.15 + i * 0.7) * 0.3;
                                 ctx.fillStyle = sparkColors[i % sparkColors.length];
-                                // 다이아몬드 모양 반짝이
                                 ctx.save();
                                 ctx.translate(Math.cos(a) * r, Math.sin(a) * r);
                                 ctx.rotate(a);
                                 ctx.beginPath();
-                                ctx.moveTo(0, -sparkSize * 2);
-                                ctx.lineTo(sparkSize, 0);
-                                ctx.lineTo(0, sparkSize * 2);
-                                ctx.lineTo(-sparkSize, 0);
-                                ctx.closePath();
-                                ctx.fill();
+                                ctx.moveTo(0, -sparkSize * 2); ctx.lineTo(sparkSize, 0);
+                                ctx.lineTo(0, sparkSize * 2); ctx.lineTo(-sparkSize, 0);
+                                ctx.closePath(); ctx.fill();
                                 ctx.restore();
                             }
                             ctx.globalAlpha = 1;
                         }
-
-                        // 3) 떠오르는 하트들 (레벨 2+)
+                        // 떠오르는 하트들 (레벨 2+)
                         if (beautyLevel >= 2) {
                             const heartCount = 2 + beautyLevel;
                             for (let i = 0; i < heartCount; i++) {
-                                const hx = Math.sin(frameIndex * 0.06 + i * 1.8) * 20;
+                                const hx = Math.sin(frameIndex * 0.06 + i * 1.8) * 22;
                                 const hy = -20 - (frameIndex * 0.5 + i * 8) % 30;
                                 ctx.globalAlpha = 0.4 + Math.sin(frameIndex * 0.1 + i) * 0.2;
-                                ctx.fillStyle = beautyLevel >= 4 ? '#FFD700' : '#FF4081';
-                                ctx.font = `${8 + beautyLevel}px Arial`;
-                                ctx.textAlign = 'center';
+                                ctx.fillStyle = beautyLevel >= 5 ? '#E040FB' : beautyLevel >= 4 ? '#FFD700' : '#FF4081';
+                                ctx.font = `${8 + beautyLevel}px Arial`; ctx.textAlign = 'center';
                                 ctx.fillText('♥', hx, hy);
+                            }
+                            ctx.globalAlpha = 1;
+                        }
+                        // Lv5 먹기: 음표 파티클
+                        if (beautyLevel >= 5) {
+                            const noteChars = ['♪', '♫', '♬', '✧'];
+                            for (let i = 0; i < 5; i++) {
+                                const a = frameIndex * 0.07 + i * 1.3;
+                                const r = 30 + Math.sin(a * 0.6) * 8;
+                                ctx.globalAlpha = 0.5 + Math.sin(a) * 0.3;
+                                ctx.fillStyle = ['#E040FB', '#7C4DFF', '#FFD740', '#18FFFF', '#FF4081'][i];
+                                ctx.font = '10px Arial'; ctx.textAlign = 'center';
+                                ctx.fillText(noteChars[i % noteChars.length], Math.cos(a) * r, Math.sin(a) * r);
                             }
                             ctx.globalAlpha = 1;
                         }
                     }
 
-                    // 몸체 (둥근 얼굴 — 레벨에 따라 색상 변화)
-                    const bodyGrad = ctx.createRadialGradient(-3, -4, 4, 0, 0, 24);
-                    bodyGrad.addColorStop(0, bc[0]);
-                    bodyGrad.addColorStop(0.35, bc[1]);
-                    bodyGrad.addColorStop(0.7, bc[2]);
-                    bodyGrad.addColorStop(1, bc[3]);
-                    ctx.fillStyle = bodyGrad;
+                    // ═══ 몸체 ═══
+                    // Lv5 아이돌: 홀로그램 반사 효과
+                    if (beautyLevel >= 5) {
+                        // 몸체에 홀로그램 그라데이션
+                        const holoBody = ctx.createLinearGradient(-24, -24, 24, 24);
+                        const holoShift = (frameIndex * 0.02) % 1;
+                        holoBody.addColorStop((0 + holoShift) % 1, '#F3E5F5');
+                        holoBody.addColorStop((0.25 + holoShift) % 1, '#E1BEE7');
+                        holoBody.addColorStop((0.5 + holoShift) % 1, '#B2EBF2');
+                        holoBody.addColorStop((0.75 + holoShift) % 1, '#F8BBD0');
+                        holoBody.addColorStop(1, '#F3E5F5');
+                        ctx.fillStyle = holoBody;
+                    } else {
+                        const bodyGrad = ctx.createRadialGradient(-3, -4, 4, 0, 0, 24);
+                        bodyGrad.addColorStop(0, bc[0]);
+                        bodyGrad.addColorStop(0.35, bc[1]);
+                        bodyGrad.addColorStop(0.7, bc[2]);
+                        bodyGrad.addColorStop(1, bc[3]);
+                        ctx.fillStyle = bodyGrad;
+                    }
                     ctx.beginPath(); ctx.arc(0, 1, 24, 0, Math.PI * 2); ctx.fill();
 
-                    // 외곽선
-                    ctx.strokeStyle = bc[3];
-                    ctx.lineWidth = 1.5;
+                    // 외곽선 (Lv5: 반짝이 테두리)
+                    if (beautyLevel >= 5) {
+                        ctx.strokeStyle = `hsl(${(frameIndex * 2) % 360}, 80%, 70%)`;
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([3, 3]);
+                        ctx.lineDashOffset = frameIndex * 0.5;
+                    } else {
+                        ctx.strokeStyle = bc[3];
+                        ctx.lineWidth = 1.5;
+                    }
                     ctx.beginPath(); ctx.arc(0, 1, 24, 0, Math.PI * 2); ctx.stroke();
+                    ctx.setLineDash([]);
 
-                    // 볼터치 (레벨 올라갈수록 더 화사)
-                    const blushAlpha = 0.3 + beautyLevel * 0.1;
-                    ctx.fillStyle = `rgba(255,105,180,${blushAlpha})`;
-                    ctx.beginPath(); ctx.arc(-15, 5, 5 + beautyLevel * 0.5, 0, Math.PI * 2); ctx.fill();
-                    ctx.beginPath(); ctx.arc(15, 5, 5 + beautyLevel * 0.5, 0, Math.PI * 2); ctx.fill();
+                    // 볼터치 (먹은 수에 따라 미세하게 커짐)
+                    const blushAlpha = 0.3 + beautyLevel * 0.08 + subProgress * 0.04;
+                    const blushSize = 5 + beautyLevel * 0.4 + subProgress * 0.3;
+                    ctx.fillStyle = beautyLevel >= 5 ? `rgba(206,147,216,${blushAlpha + 0.1})` : `rgba(255,105,180,${blushAlpha})`;
+                    ctx.beginPath(); ctx.arc(-15, 5, blushSize, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(15, 5, blushSize, 0, Math.PI * 2); ctx.fill();
+                    // Lv5: 반짝이 볼터치
+                    if (beautyLevel >= 5) {
+                        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                        ctx.beginPath(); ctx.arc(-14, 4, 2, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(14, 4, 2, 0, Math.PI * 2); ctx.fill();
+                    }
 
-                    // 눈 (레벨에 따라 점점 반짝이는 눈)
+                    // ═══ 눈 ═══
                     if (isEating) {
-                        // 먹는 중: ^_^ 눈
-                        ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                        ctx.strokeStyle = beautyLevel >= 5 ? '#7B1FA2' : '#333';
+                        ctx.lineWidth = 2; ctx.lineCap = 'round';
                         ctx.beginPath(); ctx.arc(-8, -4, 4, Math.PI, 0); ctx.stroke();
                         ctx.beginPath(); ctx.arc(8, -4, 4, Math.PI, 0); ctx.stroke();
                     } else {
-                        // 큰 눈
-                        const eyeSize = 5 + beautyLevel * 0.5;
+                        const eyeSize = 5 + beautyLevel * 0.4 + subProgress * 0.2;
+                        // Lv5: 보라빛 눈
                         ctx.fillStyle = '#FFFFFF';
                         ctx.beginPath(); ctx.arc(-8, -4, eyeSize, 0, Math.PI * 2); ctx.fill();
                         ctx.beginPath(); ctx.arc(8, -4, eyeSize, 0, Math.PI * 2); ctx.fill();
-                        // 동공
-                        ctx.fillStyle = '#333';
+                        // 동공 (Lv5는 보라색)
+                        ctx.fillStyle = beautyLevel >= 5 ? '#6A1B9A' : '#333';
                         ctx.beginPath(); ctx.arc(-7, -4, eyeSize * 0.55, 0, Math.PI * 2); ctx.fill();
                         ctx.beginPath(); ctx.arc(9, -4, eyeSize * 0.55, 0, Math.PI * 2); ctx.fill();
-                        // 하이라이트 (레벨 높을수록 반짝)
+                        // 하이라이트
                         if (beautyLevel >= 1) {
                             ctx.fillStyle = '#FFF';
-                            ctx.beginPath(); ctx.arc(-9, -6, 2, 0, Math.PI * 2); ctx.fill();
-                            ctx.beginPath(); ctx.arc(7, -6, 2, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(-9, -6, 2 + subProgress * 0.3, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(7, -6, 2 + subProgress * 0.3, 0, Math.PI * 2); ctx.fill();
                         }
                         if (beautyLevel >= 3) {
-                            ctx.fillStyle = '#FFF';
+                            ctx.fillStyle = beautyLevel >= 5 ? '#E1BEE7' : '#FFF';
                             ctx.beginPath(); ctx.arc(-6, -3, 1.2, 0, Math.PI * 2); ctx.fill();
                             ctx.beginPath(); ctx.arc(10, -3, 1.2, 0, Math.PI * 2); ctx.fill();
                         }
+                        // Lv5: 별 모양 하이라이트
+                        if (beautyLevel >= 5) {
+                            ctx.fillStyle = '#FFD740';
+                            ctx.font = '4px Arial'; ctx.textAlign = 'center';
+                            ctx.fillText('✦', -9, -6);
+                            ctx.fillText('✦', 7, -6);
+                        }
                     }
 
-                    // 속눈썹 (레벨 2부터)
+                    // 속눈썹 (레벨 2부터, Lv5는 더 길고 화려)
                     if (beautyLevel >= 2) {
-                        ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
-                        ctx.beginPath(); ctx.moveTo(-13, -7); ctx.lineTo(-11, -10); ctx.stroke();
-                        ctx.beginPath(); ctx.moveTo(13, -7); ctx.lineTo(11, -10); ctx.stroke();
+                        ctx.strokeStyle = beautyLevel >= 5 ? '#6A1B9A' : '#333';
+                        ctx.lineWidth = beautyLevel >= 5 ? 2 : 1.5;
+                        ctx.lineCap = 'round';
+                        const lashLen = beautyLevel >= 5 ? 5 : 3;
+                        ctx.beginPath(); ctx.moveTo(-13, -7); ctx.lineTo(-11, -7 - lashLen); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(13, -7); ctx.lineTo(11, -7 - lashLen); ctx.stroke();
+                        if (beautyLevel >= 5) {
+                            // 추가 속눈썹
+                            ctx.beginPath(); ctx.moveTo(-11, -8); ctx.lineTo(-8, -12); ctx.stroke();
+                            ctx.beginPath(); ctx.moveTo(11, -8); ctx.lineTo(8, -12); ctx.stroke();
+                        }
                     }
 
-                    // 입
+                    // ═══ 입 ═══
                     if (isEating) {
-                        // 먹는 입 (크기 레벨에 따라)
                         const mouthOpen = 7 + Math.abs(Math.sin(frameIndex * 0.2)) * 3 + beautyLevel * 0.5;
-                        // 입 안쪽 그라데이션
                         const mouthGrad = ctx.createRadialGradient(0, 10, 1, 0, 10, mouthOpen);
-                        mouthGrad.addColorStop(0, '#880E4F');
-                        mouthGrad.addColorStop(0.7, '#E91E63');
-                        mouthGrad.addColorStop(1, '#F48FB1');
+                        mouthGrad.addColorStop(0, beautyLevel >= 5 ? '#4A148C' : '#880E4F');
+                        mouthGrad.addColorStop(0.7, beautyLevel >= 5 ? '#7B1FA2' : '#E91E63');
+                        mouthGrad.addColorStop(1, beautyLevel >= 5 ? '#CE93D8' : '#F48FB1');
                         ctx.fillStyle = mouthGrad;
                         ctx.beginPath(); ctx.arc(0, 10, mouthOpen, 0, Math.PI * 2); ctx.fill();
 
-                        // 입 주변 하트 파티클 (레벨에 따라 많아짐)
                         const mouthHeartCount = 3 + beautyLevel;
-                        const mouthHeartColors = ['#FF80AB', '#FF4081', '#E040FB', '#FFD700', '#FF1744'];
+                        const mhColors = beautyLevel >= 5 ? ['#E040FB', '#7C4DFF', '#448AFF', '#FFD740', '#18FFFF'] :
+                                         ['#FF80AB', '#FF4081', '#E040FB', '#FFD700', '#FF1744'];
                         for (let i = 0; i < mouthHeartCount; i++) {
                             const a = frameIndex * 0.25 + i * (6.28 / mouthHeartCount);
                             const r = 16 + Math.sin(a * 0.8) * 5 + beautyLevel * 2;
                             ctx.globalAlpha = 0.5 + Math.sin(a * 1.5) * 0.3;
-                            ctx.fillStyle = mouthHeartColors[i % mouthHeartColors.length];
-                            const heartSize = 7 + beautyLevel;
-                            ctx.font = `${heartSize}px Arial`; ctx.textAlign = 'center';
-                            ctx.fillText('♥', Math.cos(a) * r, 8 + Math.sin(a) * r * 0.5);
+                            ctx.fillStyle = mhColors[i % mhColors.length];
+                            ctx.font = `${7 + beautyLevel}px Arial`; ctx.textAlign = 'center';
+                            ctx.fillText(beautyLevel >= 5 ? '💜' : '♥', Math.cos(a) * r, 8 + Math.sin(a) * r * 0.5);
                         }
-
-                        // 레벨 3+: 먹을 때 별도 추가
                         if (beautyLevel >= 3) {
                             for (let i = 0; i < 3; i++) {
                                 const a = frameIndex * 0.12 + i * 2.1;
                                 const r = 22 + beautyLevel * 2;
                                 ctx.globalAlpha = 0.4 + Math.sin(a * 2) * 0.3;
-                                ctx.fillStyle = beautyLevel >= 4 ? '#FFD700' : '#AB47BC';
+                                ctx.fillStyle = beautyLevel >= 5 ? '#7C4DFF' : beautyLevel >= 4 ? '#FFD700' : '#AB47BC';
                                 ctx.font = `${6 + beautyLevel}px Arial`;
                                 ctx.fillText('✦', Math.cos(a) * r, Math.sin(a) * r);
                             }
                         }
-
-                        // 레벨 4: 왕관에서 빛 발산
                         if (beautyLevel >= 4) {
                             ctx.globalAlpha = 0.3 + Math.sin(frameIndex * 0.15) * 0.2;
-                            ctx.strokeStyle = '#FFD700';
+                            ctx.strokeStyle = beautyLevel >= 5 ? '#E040FB' : '#FFD700';
                             ctx.lineWidth = 1.5;
                             for (let i = 0; i < 6; i++) {
                                 const a = frameIndex * 0.06 + i * (Math.PI / 3);
+                                const ri = 26, ro = 32 + Math.sin(frameIndex * 0.2 + i) * 4;
                                 ctx.beginPath();
-                                ctx.moveTo(Math.cos(a) * 26, Math.sin(a) * 26);
-                                ctx.lineTo(Math.cos(a) * (32 + Math.sin(frameIndex * 0.2 + i) * 4), Math.sin(a) * (32 + Math.sin(frameIndex * 0.2 + i) * 4));
+                                ctx.moveTo(Math.cos(a) * ri, Math.sin(a) * ri);
+                                ctx.lineTo(Math.cos(a) * ro, Math.sin(a) * ro);
                                 ctx.stroke();
                             }
                         }
-
                         ctx.globalAlpha = 1;
                     } else {
-                        // 미소 (레벨에 따라 더 환한 미소)
-                        ctx.strokeStyle = '#C2185B'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                        // 미소
+                        ctx.strokeStyle = beautyLevel >= 5 ? '#7B1FA2' : '#C2185B';
+                        ctx.lineWidth = 2; ctx.lineCap = 'round';
                         const smileWidth = 6 + beautyLevel;
                         ctx.beginPath(); ctx.arc(0, 8, smileWidth, 0.1, Math.PI - 0.1); ctx.stroke();
-                        // 레벨 3+: 입술 광택
                         if (beautyLevel >= 3) {
-                            ctx.fillStyle = 'rgba(255,182,193,0.5)';
+                            ctx.fillStyle = beautyLevel >= 5 ? 'rgba(206,147,216,0.5)' : 'rgba(255,182,193,0.5)';
                             ctx.beginPath(); ctx.arc(0, 11, 3, 0, Math.PI * 2); ctx.fill();
+                        }
+                        // Lv5: 입가에 작은 하트
+                        if (beautyLevel >= 5) {
+                            ctx.fillStyle = '#E040FB'; ctx.font = '5px Arial'; ctx.textAlign = 'center';
+                            ctx.fillText('♥', 10, 10);
                         }
                     }
 
-                    // 왕관/리본 (레벨별 장식)
+                    // ═══ 머리 장식 ═══
                     if (beautyLevel >= 1 && beautyLevel < 4) {
                         // 리본 (핑크)
                         ctx.fillStyle = '#FF4081';
@@ -1127,30 +1223,73 @@
                         ctx.fillStyle = '#F50057';
                         ctx.beginPath(); ctx.arc(0, -25.5, 3, 0, Math.PI * 2); ctx.fill();
                     }
-                    if (beautyLevel >= 4) {
-                        // 최종 진화: 왕관!
+                    if (beautyLevel === 4) {
+                        // Lv4 여신: 왕관
                         ctx.fillStyle = '#FFD700';
                         ctx.beginPath();
                         ctx.moveTo(-12, -22); ctx.lineTo(-10, -32); ctx.lineTo(-5, -25);
                         ctx.lineTo(0, -34); ctx.lineTo(5, -25);
                         ctx.lineTo(10, -32); ctx.lineTo(12, -22);
                         ctx.closePath(); ctx.fill();
-                        ctx.strokeStyle = '#FFA000'; ctx.lineWidth = 1;
-                        ctx.stroke();
-                        // 보석
+                        ctx.strokeStyle = '#FFA000'; ctx.lineWidth = 1; ctx.stroke();
                         ctx.fillStyle = '#E91E63';
                         ctx.beginPath(); ctx.arc(0, -26, 2.5, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = '#2196F3';
                         ctx.beginPath(); ctx.arc(-6, -24, 1.8, 0, Math.PI * 2); ctx.fill();
                         ctx.beginPath(); ctx.arc(6, -24, 1.8, 0, Math.PI * 2); ctx.fill();
                     }
+                    if (beautyLevel >= 5) {
+                        // Lv5 아이돌: 티아라 + 마이크 헤드셋
+                        // 티아라 (반짝이는 보라+은색)
+                        ctx.fillStyle = '#CE93D8';
+                        ctx.beginPath();
+                        ctx.moveTo(-14, -21); ctx.lineTo(-11, -30); ctx.lineTo(-6, -24);
+                        ctx.lineTo(-2, -33); ctx.lineTo(2, -24);
+                        ctx.lineTo(6, -33); ctx.lineTo(11, -24);
+                        ctx.lineTo(14, -30); ctx.lineTo(16, -21);
+                        ctx.closePath(); ctx.fill();
+                        ctx.strokeStyle = '#9C27B0'; ctx.lineWidth = 1; ctx.stroke();
+                        // 티아라 보석 (홀로그램)
+                        const gemHue = (frameIndex * 3) % 360;
+                        ctx.fillStyle = `hsl(${gemHue}, 80%, 65%)`;
+                        ctx.beginPath(); ctx.arc(-2, -27, 3, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = `hsl(${(gemHue + 120) % 360}, 80%, 65%)`;
+                        ctx.beginPath(); ctx.arc(-8, -24.5, 2, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = `hsl(${(gemHue + 240) % 360}, 80%, 65%)`;
+                        ctx.beginPath(); ctx.arc(8, -24.5, 2, 0, Math.PI * 2); ctx.fill();
 
-                    // 다리 (작고 귀여운)
+                        // 마이크 헤드셋
+                        ctx.strokeStyle = '#9E9E9E'; ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.arc(0, -2, 22, 0.3, 0.8); ctx.stroke(); // 머리띠
+                        // 마이크 봉
+                        ctx.strokeStyle = '#757575'; ctx.lineWidth = 1.2;
+                        ctx.beginPath();
+                        ctx.moveTo(20, 2); ctx.quadraticCurveTo(22, 8, 18, 12); ctx.stroke();
+                        // 마이크 끝
+                        ctx.fillStyle = '#424242';
+                        ctx.beginPath(); ctx.arc(18, 12, 2.5, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#F44336';
+                        ctx.beginPath(); ctx.arc(18, 12, 1, 0, Math.PI * 2); ctx.fill(); // 빨간 LED
+                    }
+
+                    // 다리 (작고 귀여운, Lv5는 부츠)
                     if (!isDucking) {
                         const legBounce = Math.sin(frameIndex * 0.3) * 2;
-                        ctx.fillStyle = bc[2];
-                        ctx.fillRect(-8, 22 + legBounce, 5, 8);
-                        ctx.fillRect(3, 22 - legBounce, 5, 8);
+                        if (beautyLevel >= 5) {
+                            // 아이돌 부츠
+                            ctx.fillStyle = '#7B1FA2';
+                            ctx.fillRect(-9, 22 + legBounce, 6, 10);
+                            ctx.fillRect(3, 22 - legBounce, 6, 10);
+                            // 부츠 반짝이
+                            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                            ctx.fillRect(-8, 23 + legBounce, 2, 3);
+                            ctx.fillRect(4, 23 - legBounce, 2, 3);
+                        } else {
+                            ctx.fillStyle = bc[2];
+                            ctx.fillRect(-8, 22 + legBounce, 5, 8);
+                            ctx.fillRect(3, 22 - legBounce, 5, 8);
+                        }
                     }
 
                     ctx.restore();
@@ -1749,7 +1888,7 @@
             '동그라미하준': { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
             '가스미': { name: '방귀 부스터', desc: '독가스+코인2배 (100회)', type: 'fartBoost', charges: 100, coinMulti: 2 },
             '냠냠미': { name: '먹보', desc: '장애물 냠냠 (60회) + 코인2배', type: 'eatObstacle', charges: 60, coinMulti: 2 },
-            '주주미': { name: '미모 진화', desc: '장애물 냠냠 (80회) + 먹을수록 예뻐짐!', type: 'eatObstacle', charges: 80, coinMulti: 1 },
+            '주주미': { name: '미모 진화', desc: '장애물 냠냠 (80회) 수수한→아이돌 6단계 진화!', type: 'eatObstacle', charges: 80, coinMulti: 1 },
             '농구미': { name: '슬램덩크', desc: '코인3배 + 점프력 UP', type: 'basketball', coinMulti: 3, jumpBoost: -20 },
             '비행미': { name: '비행 모드', desc: '10초 비행+코인2배 (50회)', type: 'flight', charges: 50, flightDuration: 10, coinMulti: 2 },
             '파도미': { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
@@ -3884,7 +4023,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.11.8', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.12.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4944,19 +5083,20 @@
                                 gameState.invulnTimer = 0.3;
 
                                 if (gameState.selectedCharacter === '주주미') {
-                                    // ★ 주주미 전용 화려한 이펙트 ★
+                                    // ★ 주주미 전용 화려한 이펙트 (6단계) ★
                                     const maxCh = 80;
                                     const ate = maxCh - (gameState.abilityState?.eatCharges || 0);
-                                    const bLv = Math.min(4, Math.floor(ate / 16));
+                                    const bLv = Math.min(5, Math.floor(ate / 14));
                                     const ox = obstacle.x, oy = obstacle.y;
 
                                     // 1) 미모 레벨별 메인 컬러 폭발
                                     const lvColors = [
-                                        ['#FFCDD2', '#EF9A9A', '#FF80AB'],           // Lv0: 연분홍
-                                        ['#F48FB1', '#EC407A', '#FF4081', '#FF80AB'], // Lv1: 핑크
-                                        ['#CE93D8', '#AB47BC', '#E040FB', '#FF80AB'], // Lv2: 보라+핑크
-                                        ['#81D4FA', '#29B6F6', '#E040FB', '#FF80AB', '#80DEEA'], // Lv3: 하늘+보라
-                                        ['#FFD700', '#FFC107', '#FF4081', '#E040FB', '#29B6F6', '#76FF03'] // Lv4: 레인보우
+                                        ['#FFCDD2', '#EF9A9A', '#FF80AB'],           // Lv0: 수수한
+                                        ['#F48FB1', '#EC407A', '#FF4081', '#FF80AB'], // Lv1: 귀여운
+                                        ['#CE93D8', '#AB47BC', '#E040FB', '#FF80AB'], // Lv2: 화사한
+                                        ['#81D4FA', '#29B6F6', '#E040FB', '#FF80AB', '#80DEEA'], // Lv3: 빛나는
+                                        ['#FFD700', '#FFC107', '#FF4081', '#E040FB', '#29B6F6', '#76FF03'], // Lv4: 여신
+                                        ['#E040FB', '#7C4DFF', '#448AFF', '#18FFFF', '#69F0AE', '#FFD740', '#FF4081'] // Lv5: 아이돌
                                     ];
                                     lvColors[bLv].forEach(c => {
                                         this.particles.createExplosion(ox, oy, c, 3 + bLv);
@@ -4964,7 +5104,8 @@
 
                                     // 2) 하트 파티클 (레벨 높을수록 많이)
                                     const heartCount = 3 + bLv * 2;
-                                    const heartColors = ['#FF4081', '#E91E63', '#FF80AB', '#F50057', '#FFD700'];
+                                    const heartColors = bLv >= 5 ? ['#E040FB', '#7C4DFF', '#FF4081', '#FFD740', '#18FFFF'] :
+                                                        ['#FF4081', '#E91E63', '#FF80AB', '#F50057', '#FFD700'];
                                     for (let i = 0; i < heartCount; i++) {
                                         const angle = (i / heartCount) * Math.PI * 2;
                                         const speed = 2 + Math.random() * 3;
@@ -4972,7 +5113,7 @@
                                             x: ox, y: oy,
                                             vx: Math.cos(angle) * speed,
                                             vy: Math.sin(angle) * speed - 3,
-                                            life: 1.2,
+                                            life: 1.2 + (bLv >= 5 ? 0.5 : 0),
                                             color: heartColors[i % heartColors.length],
                                             size: 4 + bLv,
                                             isHeart: true
@@ -4990,33 +5131,54 @@
                                                 vx: Math.cos(angle) * speed,
                                                 vy: Math.sin(angle) * speed - 2,
                                                 life: 1.0,
-                                                color: bLv >= 4 ? '#FFD700' : '#E040FB',
+                                                color: bLv >= 5 ? '#7C4DFF' : bLv >= 4 ? '#FFD700' : '#E040FB',
                                                 size: 3 + bLv * 0.5,
                                                 isStar: true
                                             });
                                         }
                                     }
 
-                                    // 4) 레벨 4 최종 진화: 무지개 링 폭발
+                                    // 4) 레벨 4+: 무지개 링 폭발
                                     if (bLv >= 4) {
-                                        const ringColors = ['#FF0000', '#FF8800', '#FFEE00', '#00FF66', '#0088FF', '#AA00FF'];
+                                        const ringColors = bLv >= 5 ?
+                                            ['#E040FB', '#7C4DFF', '#448AFF', '#18FFFF', '#69F0AE', '#FFD740', '#FF4081', '#AA00FF'] :
+                                            ['#FF0000', '#FF8800', '#FFEE00', '#00FF66', '#0088FF', '#AA00FF'];
                                         ringColors.forEach((c, i) => {
                                             const a = (i / ringColors.length) * Math.PI * 2;
                                             this.particles.particles.push({
                                                 x: ox, y: oy,
-                                                vx: Math.cos(a) * 5,
-                                                vy: Math.sin(a) * 5 - 1,
-                                                life: 1.5,
+                                                vx: Math.cos(a) * (bLv >= 5 ? 6 : 5),
+                                                vy: Math.sin(a) * (bLv >= 5 ? 6 : 5) - 1,
+                                                life: bLv >= 5 ? 2.0 : 1.5,
                                                 color: c,
-                                                size: 6
+                                                size: bLv >= 5 ? 7 : 6
                                             });
                                         });
                                     }
 
-                                    // 5) 화면 번쩍 이펙트 (미모 레벨에 따라)
+                                    // 5) Lv5 아이돌 전용: 음표 파티클 + 더블 하트링
+                                    if (bLv >= 5) {
+                                        // 음표 모양 큰 파티클
+                                        for (let i = 0; i < 6; i++) {
+                                            const angle = (i / 6) * Math.PI * 2;
+                                            const speed = 3 + Math.random() * 2;
+                                            this.particles.particles.push({
+                                                x: ox, y: oy,
+                                                vx: Math.cos(angle) * speed,
+                                                vy: Math.sin(angle) * speed - 4,
+                                                life: 1.8,
+                                                color: ['#E040FB', '#7C4DFF', '#FFD740', '#18FFFF', '#FF4081', '#69F0AE'][i],
+                                                size: 5,
+                                                isStar: true
+                                            });
+                                        }
+                                    }
+
+                                    // 6) 화면 번쩍 이펙트 (미모 레벨에 따라)
                                     if (bLv >= 1) {
                                         gameState.abilityState.jujumiFlashTimer = 0.15 + bLv * 0.05;
-                                        gameState.abilityState.jujumiFlashColor = bLv >= 4 ? 'rgba(255,215,0,' : 'rgba(255,128,171,';
+                                        gameState.abilityState.jujumiFlashColor = bLv >= 5 ? 'rgba(124,77,255,' :
+                                            bLv >= 4 ? 'rgba(255,215,0,' : 'rgba(255,128,171,';
                                     }
                                 } else {
                                     // 냠냠미 기본 이펙트
@@ -5367,13 +5529,20 @@
                         // 주주미 전용 HUD: 미모 레벨 표시
                         const maxC = 80;
                         const eaten = maxC - echarges;
-                        const bLv = Math.min(4, Math.floor(eaten / 16));
-                        const lvNames = ['수수한', '귀여운', '화사한', '빛나는', '✨여신✨'];
-                        const lvColors = ['#EF9A9A', '#EC407A', '#AB47BC', '#29B6F6', '#FFD700'];
+                        const bLv = Math.min(5, Math.floor(eaten / 14));
+                        const lvNames = ['수수한', '귀여운', '화사한', '빛나는', '✨여신✨', '💜아이돌💜'];
+                        const lvColors = ['#EF9A9A', '#EC407A', '#AB47BC', '#29B6F6', '#FFD700', '#7C4DFF'];
                         ctx.fillStyle = lvColors[bLv];
                         ctx.font = 'bold 14px Arial';
                         ctx.textAlign = 'left';
                         ctx.fillText(`💎 ${lvNames[bLv]} (${echarges}회 남음)`, 15, 135);
+                        // 진행도 바 (레벨 내 진행)
+                        const subProg = (eaten % 14) / 14;
+                        const barX = 15, barY = 142, barW = 120, barH = 4;
+                        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                        ctx.fillRect(barX, barY, barW, barH);
+                        ctx.fillStyle = lvColors[bLv];
+                        ctx.fillRect(barX, barY, barW * subProg, barH);
                     } else {
                         ctx.fillStyle = echarges > 0 ? '#FF8F00' : '#666';
                         ctx.font = 'bold 14px Arial';
@@ -6392,7 +6561,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.11.8';
+        const GAME_VERSION = 'v3.12.0';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
