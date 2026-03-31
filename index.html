@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.11.6';
+        var CURRENT_VER = 'v3.11.8';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -942,10 +942,58 @@
                         }
                         ctx.globalAlpha = 1;
                     }
-                    // 먹는 중 이펙트
+                    // 먹는 중 이펙트 (화려한 버전)
                     if (isEating) {
-                        ctx.fillStyle = 'rgba(255,128,171,0.25)';
-                        ctx.beginPath(); ctx.arc(0, 0, 34, 0, Math.PI * 2); ctx.fill();
+                        // 1) 바깥 글로우 링 (미모 레벨에 따라 커짐)
+                        const glowSize = 36 + beautyLevel * 4;
+                        const glowAlpha = 0.15 + beautyLevel * 0.05;
+                        const glowGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, glowSize);
+                        glowGrad.addColorStop(0, `rgba(255,128,171,${glowAlpha + 0.15})`);
+                        glowGrad.addColorStop(0.6, `rgba(255,64,129,${glowAlpha})`);
+                        glowGrad.addColorStop(1, 'rgba(255,64,129,0)');
+                        ctx.fillStyle = glowGrad;
+                        ctx.beginPath(); ctx.arc(0, 0, glowSize, 0, Math.PI * 2); ctx.fill();
+
+                        // 2) 회전하는 반짝이 (레벨 1+)
+                        if (beautyLevel >= 1) {
+                            const sparkCount = 4 + beautyLevel * 2;
+                            const sparkColors = beautyLevel >= 4 ? ['#FFD700', '#FFC107', '#FFEE58'] : ['#FF80AB', '#FF4081', '#E040FB'];
+                            for (let i = 0; i < sparkCount; i++) {
+                                const a = frameIndex * 0.08 + (i / sparkCount) * Math.PI * 2;
+                                const r = 28 + Math.sin(frameIndex * 0.15 + i) * 5;
+                                const sparkSize = 1.5 + Math.sin(frameIndex * 0.2 + i * 1.5) * 1;
+                                ctx.globalAlpha = 0.6 + Math.sin(frameIndex * 0.15 + i * 0.7) * 0.3;
+                                ctx.fillStyle = sparkColors[i % sparkColors.length];
+                                // 다이아몬드 모양 반짝이
+                                ctx.save();
+                                ctx.translate(Math.cos(a) * r, Math.sin(a) * r);
+                                ctx.rotate(a);
+                                ctx.beginPath();
+                                ctx.moveTo(0, -sparkSize * 2);
+                                ctx.lineTo(sparkSize, 0);
+                                ctx.lineTo(0, sparkSize * 2);
+                                ctx.lineTo(-sparkSize, 0);
+                                ctx.closePath();
+                                ctx.fill();
+                                ctx.restore();
+                            }
+                            ctx.globalAlpha = 1;
+                        }
+
+                        // 3) 떠오르는 하트들 (레벨 2+)
+                        if (beautyLevel >= 2) {
+                            const heartCount = 2 + beautyLevel;
+                            for (let i = 0; i < heartCount; i++) {
+                                const hx = Math.sin(frameIndex * 0.06 + i * 1.8) * 20;
+                                const hy = -20 - (frameIndex * 0.5 + i * 8) % 30;
+                                ctx.globalAlpha = 0.4 + Math.sin(frameIndex * 0.1 + i) * 0.2;
+                                ctx.fillStyle = beautyLevel >= 4 ? '#FFD700' : '#FF4081';
+                                ctx.font = `${8 + beautyLevel}px Arial`;
+                                ctx.textAlign = 'center';
+                                ctx.fillText('♥', hx, hy);
+                            }
+                            ctx.globalAlpha = 1;
+                        }
                     }
 
                     // 몸체 (둥근 얼굴 — 레벨에 따라 색상 변화)
@@ -1006,18 +1054,55 @@
 
                     // 입
                     if (isEating) {
-                        const mouthOpen = 7 + Math.abs(Math.sin(frameIndex * 0.2)) * 3;
-                        ctx.fillStyle = '#E91E63';
+                        // 먹는 입 (크기 레벨에 따라)
+                        const mouthOpen = 7 + Math.abs(Math.sin(frameIndex * 0.2)) * 3 + beautyLevel * 0.5;
+                        // 입 안쪽 그라데이션
+                        const mouthGrad = ctx.createRadialGradient(0, 10, 1, 0, 10, mouthOpen);
+                        mouthGrad.addColorStop(0, '#880E4F');
+                        mouthGrad.addColorStop(0.7, '#E91E63');
+                        mouthGrad.addColorStop(1, '#F48FB1');
+                        ctx.fillStyle = mouthGrad;
                         ctx.beginPath(); ctx.arc(0, 10, mouthOpen, 0, Math.PI * 2); ctx.fill();
-                        // 하트 파티클 (먹을 때)
-                        ctx.fillStyle = '#FF80AB';
-                        for (let i = 0; i < 3; i++) {
-                            const a = frameIndex * 0.3 + i * 2.1;
-                            const r = 18 + Math.sin(a) * 4;
-                            ctx.globalAlpha = 0.6;
-                            ctx.font = '8px Arial'; ctx.textAlign = 'center';
-                            ctx.fillText('♥', Math.cos(a) * r, 8 + Math.sin(a) * r * 0.4);
+
+                        // 입 주변 하트 파티클 (레벨에 따라 많아짐)
+                        const mouthHeartCount = 3 + beautyLevel;
+                        const mouthHeartColors = ['#FF80AB', '#FF4081', '#E040FB', '#FFD700', '#FF1744'];
+                        for (let i = 0; i < mouthHeartCount; i++) {
+                            const a = frameIndex * 0.25 + i * (6.28 / mouthHeartCount);
+                            const r = 16 + Math.sin(a * 0.8) * 5 + beautyLevel * 2;
+                            ctx.globalAlpha = 0.5 + Math.sin(a * 1.5) * 0.3;
+                            ctx.fillStyle = mouthHeartColors[i % mouthHeartColors.length];
+                            const heartSize = 7 + beautyLevel;
+                            ctx.font = `${heartSize}px Arial`; ctx.textAlign = 'center';
+                            ctx.fillText('♥', Math.cos(a) * r, 8 + Math.sin(a) * r * 0.5);
                         }
+
+                        // 레벨 3+: 먹을 때 별도 추가
+                        if (beautyLevel >= 3) {
+                            for (let i = 0; i < 3; i++) {
+                                const a = frameIndex * 0.12 + i * 2.1;
+                                const r = 22 + beautyLevel * 2;
+                                ctx.globalAlpha = 0.4 + Math.sin(a * 2) * 0.3;
+                                ctx.fillStyle = beautyLevel >= 4 ? '#FFD700' : '#AB47BC';
+                                ctx.font = `${6 + beautyLevel}px Arial`;
+                                ctx.fillText('✦', Math.cos(a) * r, Math.sin(a) * r);
+                            }
+                        }
+
+                        // 레벨 4: 왕관에서 빛 발산
+                        if (beautyLevel >= 4) {
+                            ctx.globalAlpha = 0.3 + Math.sin(frameIndex * 0.15) * 0.2;
+                            ctx.strokeStyle = '#FFD700';
+                            ctx.lineWidth = 1.5;
+                            for (let i = 0; i < 6; i++) {
+                                const a = frameIndex * 0.06 + i * (Math.PI / 3);
+                                ctx.beginPath();
+                                ctx.moveTo(Math.cos(a) * 26, Math.sin(a) * 26);
+                                ctx.lineTo(Math.cos(a) * (32 + Math.sin(frameIndex * 0.2 + i) * 4), Math.sin(a) * (32 + Math.sin(frameIndex * 0.2 + i) * 4));
+                                ctx.stroke();
+                            }
+                        }
+
                         ctx.globalAlpha = 1;
                     } else {
                         // 미소 (레벨에 따라 더 환한 미소)
@@ -2279,9 +2364,43 @@
                     ctx.save();
                     ctx.globalAlpha = p.life;
                     ctx.fillStyle = p.color;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                    ctx.fill();
+
+                    if (p.isHeart) {
+                        // ♥ 하트 모양 파티클
+                        const s = p.size;
+                        ctx.translate(p.x, p.y);
+                        ctx.beginPath();
+                        ctx.moveTo(0, s * 0.3);
+                        ctx.bezierCurveTo(-s * 0.5, -s * 0.3, -s, s * 0.1, 0, s);
+                        ctx.bezierCurveTo(s, s * 0.1, s * 0.5, -s * 0.3, 0, s * 0.3);
+                        ctx.fill();
+                    } else if (p.isStar) {
+                        // ★ 별 모양 파티클
+                        const s = p.size;
+                        ctx.translate(p.x, p.y);
+                        ctx.rotate(p.life * 3); // 회전 애니메이션
+                        ctx.beginPath();
+                        for (let i = 0; i < 5; i++) {
+                            const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+                            const r = i === 0 ? s : s;
+                            ctx[i === 0 ? 'moveTo' : 'lineTo'](Math.cos(a) * s, Math.sin(a) * s);
+                            const a2 = a + Math.PI / 5;
+                            ctx.lineTo(Math.cos(a2) * s * 0.4, Math.sin(a2) * s * 0.4);
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                        // 별 광택
+                        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, s * 0.3, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        // 기본 원형 파티클
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
                     ctx.restore();
                 });
             }
@@ -3765,7 +3884,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.11.6', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.11.8', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4488,6 +4607,8 @@
                 if (this.waveEffectTimer > 0) this.waveEffectTimer -= deltaTime;
                 // 냠냠미 먹기 이펙트 타이머 감소
                 if (gameState.abilityState?.eatEffectTimer > 0) gameState.abilityState.eatEffectTimer -= deltaTime;
+                // 주주미 화면 플래시 타이머
+                if (gameState.abilityState?.jujumiFlashTimer > 0) gameState.abilityState.jujumiFlashTimer -= deltaTime;
 
                 // ═══════════════════════════════════════════════════════════
                 // 속도 시스템 (v3.0 전면 재설계)
@@ -4815,17 +4936,96 @@
                                 return; // 데미지 무시
                             }
 
-                            // 냠냠미 능력: 장애물 먹기 (60회)
+                            // 냠냠미/주주미 능력: 장애물 먹기
                             if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'eatObstacle' &&
                                 (gameState.abilityState?.eatCharges || 0) > 0) {
                                 gameState.abilityState.eatCharges--;
                                 gameState.abilityState.eatEffectTimer = 0.6; // 먹는 표정 타이머
                                 gameState.invulnTimer = 0.3;
-                                // 냠냠 이펙트: 음식 파티클 + 별 이펙트
-                                const eatColors = ['#FF5722', '#8BC34A', '#FFEB3B', '#FF9800', '#E91E63'];
-                                eatColors.forEach(c => {
-                                    this.particles.createExplosion(obstacle.x, obstacle.y, c, 4);
-                                });
+
+                                if (gameState.selectedCharacter === '주주미') {
+                                    // ★ 주주미 전용 화려한 이펙트 ★
+                                    const maxCh = 80;
+                                    const ate = maxCh - (gameState.abilityState?.eatCharges || 0);
+                                    const bLv = Math.min(4, Math.floor(ate / 16));
+                                    const ox = obstacle.x, oy = obstacle.y;
+
+                                    // 1) 미모 레벨별 메인 컬러 폭발
+                                    const lvColors = [
+                                        ['#FFCDD2', '#EF9A9A', '#FF80AB'],           // Lv0: 연분홍
+                                        ['#F48FB1', '#EC407A', '#FF4081', '#FF80AB'], // Lv1: 핑크
+                                        ['#CE93D8', '#AB47BC', '#E040FB', '#FF80AB'], // Lv2: 보라+핑크
+                                        ['#81D4FA', '#29B6F6', '#E040FB', '#FF80AB', '#80DEEA'], // Lv3: 하늘+보라
+                                        ['#FFD700', '#FFC107', '#FF4081', '#E040FB', '#29B6F6', '#76FF03'] // Lv4: 레인보우
+                                    ];
+                                    lvColors[bLv].forEach(c => {
+                                        this.particles.createExplosion(ox, oy, c, 3 + bLv);
+                                    });
+
+                                    // 2) 하트 파티클 (레벨 높을수록 많이)
+                                    const heartCount = 3 + bLv * 2;
+                                    const heartColors = ['#FF4081', '#E91E63', '#FF80AB', '#F50057', '#FFD700'];
+                                    for (let i = 0; i < heartCount; i++) {
+                                        const angle = (i / heartCount) * Math.PI * 2;
+                                        const speed = 2 + Math.random() * 3;
+                                        this.particles.particles.push({
+                                            x: ox, y: oy,
+                                            vx: Math.cos(angle) * speed,
+                                            vy: Math.sin(angle) * speed - 3,
+                                            life: 1.2,
+                                            color: heartColors[i % heartColors.length],
+                                            size: 4 + bLv,
+                                            isHeart: true
+                                        });
+                                    }
+
+                                    // 3) 별 반짝이 (레벨 2부터)
+                                    if (bLv >= 2) {
+                                        const starCount = 2 + (bLv - 2) * 3;
+                                        for (let i = 0; i < starCount; i++) {
+                                            const angle = Math.random() * Math.PI * 2;
+                                            const speed = 1.5 + Math.random() * 2.5;
+                                            this.particles.particles.push({
+                                                x: ox, y: oy,
+                                                vx: Math.cos(angle) * speed,
+                                                vy: Math.sin(angle) * speed - 2,
+                                                life: 1.0,
+                                                color: bLv >= 4 ? '#FFD700' : '#E040FB',
+                                                size: 3 + bLv * 0.5,
+                                                isStar: true
+                                            });
+                                        }
+                                    }
+
+                                    // 4) 레벨 4 최종 진화: 무지개 링 폭발
+                                    if (bLv >= 4) {
+                                        const ringColors = ['#FF0000', '#FF8800', '#FFEE00', '#00FF66', '#0088FF', '#AA00FF'];
+                                        ringColors.forEach((c, i) => {
+                                            const a = (i / ringColors.length) * Math.PI * 2;
+                                            this.particles.particles.push({
+                                                x: ox, y: oy,
+                                                vx: Math.cos(a) * 5,
+                                                vy: Math.sin(a) * 5 - 1,
+                                                life: 1.5,
+                                                color: c,
+                                                size: 6
+                                            });
+                                        });
+                                    }
+
+                                    // 5) 화면 번쩍 이펙트 (미모 레벨에 따라)
+                                    if (bLv >= 1) {
+                                        gameState.abilityState.jujumiFlashTimer = 0.15 + bLv * 0.05;
+                                        gameState.abilityState.jujumiFlashColor = bLv >= 4 ? 'rgba(255,215,0,' : 'rgba(255,128,171,';
+                                    }
+                                } else {
+                                    // 냠냠미 기본 이펙트
+                                    const eatColors = ['#FF5722', '#8BC34A', '#FFEB3B', '#FF9800', '#E91E63'];
+                                    eatColors.forEach(c => {
+                                        this.particles.createExplosion(obstacle.x, obstacle.y, c, 4);
+                                    });
+                                }
+
                                 this.obstacles = this.obstacles.filter(o => o !== obstacle);
                                 addCoins(1); // 먹으면 코인 보너스
                                 audioManager.playCoinSound();
@@ -5238,6 +5438,23 @@
                     ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
                     ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
                     gameState.hitFlashTimer -= 1/60; // 프레임당 감소
+                }
+
+                // ★ 주주미 먹기 화면 플래시 이펙트 ★
+                if (gameState.abilityState?.jujumiFlashTimer > 0) {
+                    const jft = gameState.abilityState.jujumiFlashTimer;
+                    const colorBase = gameState.abilityState.jujumiFlashColor || 'rgba(255,128,171,';
+                    const flashA = Math.min(0.3, jft * 1.5);
+                    ctx.fillStyle = colorBase + flashA + ')';
+                    ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+                    // 화면 가장자리 빛나는 테두리
+                    const borderGlow = ctx.createLinearGradient(0, 0, 0, GAME_CONFIG.height);
+                    borderGlow.addColorStop(0, colorBase + (flashA * 0.8) + ')');
+                    borderGlow.addColorStop(0.3, 'rgba(255,255,255,0)');
+                    borderGlow.addColorStop(0.7, 'rgba(255,255,255,0)');
+                    borderGlow.addColorStop(1, colorBase + (flashA * 0.8) + ')');
+                    ctx.fillStyle = borderGlow;
+                    ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
                 }
 
                 // 피격 무적 표시 (테두리 깜빡임)
@@ -6175,7 +6392,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.11.6';
+        const GAME_VERSION = 'v3.11.8';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
