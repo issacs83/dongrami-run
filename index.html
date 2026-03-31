@@ -5164,7 +5164,7 @@
                 // 파도미 파도 버튼: 우측 하단 (쿨다운 보호)
                 const abilityTypeWave = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
                 if (abilityTypeWave === 'waveBlast' && inputState.jumping && !gameState.isPaused &&
-                    (gameState.abilityState?.waveCharges || 0) > 0 && this.waveEffectTimer <= 0 &&
+                    (gameState.abilityState?.waveCharges || 0) > 0 && (this.waveEffectTimer || 0) <= 0 &&
                     mx >= GAME_CONFIG.width - 120 && mx <= GAME_CONFIG.width - 10 &&
                     my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
                     this.activateWaveBlast();
@@ -5175,7 +5175,7 @@
                 // 가스미 방귀 부스터 버튼: 우측 하단 (쿨다운 보호)
                 const abilityType = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
                 if (abilityType === 'fartBoost' && inputState.jumping && !gameState.isPaused &&
-                    (gameState.abilityState?.fartCharges || 0) > 0 && this.fartEffectTimer <= 0 &&
+                    (gameState.abilityState?.fartCharges || 0) > 0 && (this.fartEffectTimer || 0) <= 0 &&
                     mx >= GAME_CONFIG.width - 120 && mx <= GAME_CONFIG.width - 10 &&
                     my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
                     this.activateFartBoost();
