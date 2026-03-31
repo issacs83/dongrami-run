@@ -907,6 +907,172 @@
                 cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 주주미 (미모 진화 캐릭터 - 장애물 80회 먹기 + 먹을수록 예뻐짐)
+            const jujumi = {
+                name: '주주미', colors: { main: '#FF80AB', secondary: '#F50057' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const isEating = gameState.abilityState?.eatEffectTimer > 0;
+                    // 미모 레벨 계산 (먹을수록 예뻐짐: 80→0 = 레벨 0→4)
+                    const maxCharges = 80;
+                    const eaten = maxCharges - (gameState.abilityState?.eatCharges || 0);
+                    const beautyLevel = Math.min(4, Math.floor(eaten / 16)); // 0,1,2,3,4 (16개마다 진화)
+
+                    // 미모 레벨별 색상
+                    const bodyColors = [
+                        ['#FFCDD2', '#EF9A9A', '#E57373', '#D32F2F'], // Lv0: 연분홍 (수수한)
+                        ['#F8BBD0', '#F48FB1', '#EC407A', '#C2185B'], // Lv1: 핑크
+                        ['#E1BEE7', '#CE93D8', '#AB47BC', '#7B1FA2'], // Lv2: 보라
+                        ['#B3E5FC', '#81D4FA', '#29B6F6', '#0288D1'], // Lv3: 하늘
+                        ['#FFF9C4', '#FFF176', '#FFEE58', '#FFD600'], // Lv4: 골든 (최종 진화!)
+                    ];
+                    const bc = bodyColors[beautyLevel];
+
+                    // 최종 진화 오라
+                    if (beautyLevel >= 4) {
+                        ctx.fillStyle = 'rgba(255,215,0,0.15)';
+                        ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.fill();
+                        // 반짝이는 별
+                        ctx.fillStyle = '#FFD700';
+                        for (let i = 0; i < 5; i++) {
+                            const a = frameIndex * 0.05 + i * 1.26;
+                            const r = 32 + Math.sin(a * 2) * 4;
+                            ctx.globalAlpha = 0.5 + Math.sin(a * 3) * 0.3;
+                            ctx.beginPath(); ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 2, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    // 먹는 중 이펙트
+                    if (isEating) {
+                        ctx.fillStyle = 'rgba(255,128,171,0.25)';
+                        ctx.beginPath(); ctx.arc(0, 0, 34, 0, Math.PI * 2); ctx.fill();
+                    }
+
+                    // 몸체 (둥근 얼굴 — 레벨에 따라 색상 변화)
+                    const bodyGrad = ctx.createRadialGradient(-3, -4, 4, 0, 0, 24);
+                    bodyGrad.addColorStop(0, bc[0]);
+                    bodyGrad.addColorStop(0.35, bc[1]);
+                    bodyGrad.addColorStop(0.7, bc[2]);
+                    bodyGrad.addColorStop(1, bc[3]);
+                    ctx.fillStyle = bodyGrad;
+                    ctx.beginPath(); ctx.arc(0, 1, 24, 0, Math.PI * 2); ctx.fill();
+
+                    // 외곽선
+                    ctx.strokeStyle = bc[3];
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.arc(0, 1, 24, 0, Math.PI * 2); ctx.stroke();
+
+                    // 볼터치 (레벨 올라갈수록 더 화사)
+                    const blushAlpha = 0.3 + beautyLevel * 0.1;
+                    ctx.fillStyle = `rgba(255,105,180,${blushAlpha})`;
+                    ctx.beginPath(); ctx.arc(-15, 5, 5 + beautyLevel * 0.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(15, 5, 5 + beautyLevel * 0.5, 0, Math.PI * 2); ctx.fill();
+
+                    // 눈 (레벨에 따라 점점 반짝이는 눈)
+                    if (isEating) {
+                        // 먹는 중: ^_^ 눈
+                        ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.arc(-8, -4, 4, Math.PI, 0); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(8, -4, 4, Math.PI, 0); ctx.stroke();
+                    } else {
+                        // 큰 눈
+                        const eyeSize = 5 + beautyLevel * 0.5;
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath(); ctx.arc(-8, -4, eyeSize, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(8, -4, eyeSize, 0, Math.PI * 2); ctx.fill();
+                        // 동공
+                        ctx.fillStyle = '#333';
+                        ctx.beginPath(); ctx.arc(-7, -4, eyeSize * 0.55, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(9, -4, eyeSize * 0.55, 0, Math.PI * 2); ctx.fill();
+                        // 하이라이트 (레벨 높을수록 반짝)
+                        if (beautyLevel >= 1) {
+                            ctx.fillStyle = '#FFF';
+                            ctx.beginPath(); ctx.arc(-9, -6, 2, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(7, -6, 2, 0, Math.PI * 2); ctx.fill();
+                        }
+                        if (beautyLevel >= 3) {
+                            ctx.fillStyle = '#FFF';
+                            ctx.beginPath(); ctx.arc(-6, -3, 1.2, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(10, -3, 1.2, 0, Math.PI * 2); ctx.fill();
+                        }
+                    }
+
+                    // 속눈썹 (레벨 2부터)
+                    if (beautyLevel >= 2) {
+                        ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.moveTo(-13, -7); ctx.lineTo(-11, -10); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(13, -7); ctx.lineTo(11, -10); ctx.stroke();
+                    }
+
+                    // 입
+                    if (isEating) {
+                        const mouthOpen = 7 + Math.abs(Math.sin(frameIndex * 0.2)) * 3;
+                        ctx.fillStyle = '#E91E63';
+                        ctx.beginPath(); ctx.arc(0, 10, mouthOpen, 0, Math.PI * 2); ctx.fill();
+                        // 하트 파티클 (먹을 때)
+                        ctx.fillStyle = '#FF80AB';
+                        for (let i = 0; i < 3; i++) {
+                            const a = frameIndex * 0.3 + i * 2.1;
+                            const r = 18 + Math.sin(a) * 4;
+                            ctx.globalAlpha = 0.6;
+                            ctx.font = '8px Arial'; ctx.textAlign = 'center';
+                            ctx.fillText('♥', Math.cos(a) * r, 8 + Math.sin(a) * r * 0.4);
+                        }
+                        ctx.globalAlpha = 1;
+                    } else {
+                        // 미소 (레벨에 따라 더 환한 미소)
+                        ctx.strokeStyle = '#C2185B'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                        const smileWidth = 6 + beautyLevel;
+                        ctx.beginPath(); ctx.arc(0, 8, smileWidth, 0.1, Math.PI - 0.1); ctx.stroke();
+                        // 레벨 3+: 입술 광택
+                        if (beautyLevel >= 3) {
+                            ctx.fillStyle = 'rgba(255,182,193,0.5)';
+                            ctx.beginPath(); ctx.arc(0, 11, 3, 0, Math.PI * 2); ctx.fill();
+                        }
+                    }
+
+                    // 왕관/리본 (레벨별 장식)
+                    if (beautyLevel >= 1 && beautyLevel < 4) {
+                        // 리본 (핑크)
+                        ctx.fillStyle = '#FF4081';
+                        ctx.beginPath();
+                        ctx.moveTo(-3, -24); ctx.lineTo(-10, -30); ctx.lineTo(-3, -27);
+                        ctx.lineTo(3, -27); ctx.lineTo(10, -30); ctx.lineTo(3, -24);
+                        ctx.closePath(); ctx.fill();
+                        ctx.fillStyle = '#F50057';
+                        ctx.beginPath(); ctx.arc(0, -25.5, 3, 0, Math.PI * 2); ctx.fill();
+                    }
+                    if (beautyLevel >= 4) {
+                        // 최종 진화: 왕관!
+                        ctx.fillStyle = '#FFD700';
+                        ctx.beginPath();
+                        ctx.moveTo(-12, -22); ctx.lineTo(-10, -32); ctx.lineTo(-5, -25);
+                        ctx.lineTo(0, -34); ctx.lineTo(5, -25);
+                        ctx.lineTo(10, -32); ctx.lineTo(12, -22);
+                        ctx.closePath(); ctx.fill();
+                        ctx.strokeStyle = '#FFA000'; ctx.lineWidth = 1;
+                        ctx.stroke();
+                        // 보석
+                        ctx.fillStyle = '#E91E63';
+                        ctx.beginPath(); ctx.arc(0, -26, 2.5, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#2196F3';
+                        ctx.beginPath(); ctx.arc(-6, -24, 1.8, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(6, -24, 1.8, 0, Math.PI * 2); ctx.fill();
+                    }
+
+                    // 다리 (작고 귀여운)
+                    if (!isDucking) {
+                        const legBounce = Math.sin(frameIndex * 0.3) * 2;
+                        ctx.fillStyle = bc[2];
+                        ctx.fillRect(-8, 22 + legBounce, 5, 8);
+                        ctx.fillRect(3, 22 - legBounce, 5, 8);
+                    }
+
+                    ctx.restore();
+                },
+                cost: 500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 농구미 (농구공 캐릭터 - 높은 점프 + 코인3배)
             const nonggoomi = {
                 name: '농구미', colors: { main: '#FF6F00', secondary: '#E65100' }, size: 64,
@@ -1387,9 +1553,9 @@
             };
 
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '농구미', '비행미', '파도미', '무사', '악마', '천사', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '주주미', '농구미', '비행미', '파도미', '무사', '악마', '천사', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '무사': musa, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '주주미': jujumi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '무사': musa, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -1498,6 +1664,7 @@
             '동그라미하준': { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
             '가스미': { name: '방귀 부스터', desc: '독가스+코인2배 (100회)', type: 'fartBoost', charges: 100, coinMulti: 2 },
             '냠냠미': { name: '먹보', desc: '장애물 냠냠 (60회) + 코인2배', type: 'eatObstacle', charges: 60, coinMulti: 2 },
+            '주주미': { name: '미모 진화', desc: '장애물 냠냠 (80회) + 먹을수록 예뻐짐!', type: 'eatObstacle', charges: 80, coinMulti: 1 },
             '농구미': { name: '슬램덩크', desc: '코인3배 + 점프력 UP', type: 'basketball', coinMulti: 3, jumpBoost: -20 },
             '비행미': { name: '비행 모드', desc: '10초 비행+코인2배 (50회)', type: 'flight', charges: 50, flightDuration: 10, coinMulti: 2 },
             '파도미': { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
@@ -4993,13 +5160,26 @@
                         ctx.fillText('(F키)', btnX + 55, btnY + 45);
                     }
                 }
-                // 냠냠미 먹기 HUD
+                // 냠냠미/주주미 먹기 HUD
                 if (abilityType === 'eatObstacle') {
                     const echarges = gameState.abilityState?.eatCharges || 0;
-                    ctx.fillStyle = echarges > 0 ? '#FF8F00' : '#666';
-                    ctx.font = 'bold 14px Arial';
-                    ctx.textAlign = 'left';
-                    ctx.fillText(`🍴 냠냠 ${echarges}회`, 15, 135);
+                    if (gameState.selectedCharacter === '주주미') {
+                        // 주주미 전용 HUD: 미모 레벨 표시
+                        const maxC = 80;
+                        const eaten = maxC - echarges;
+                        const bLv = Math.min(4, Math.floor(eaten / 16));
+                        const lvNames = ['수수한', '귀여운', '화사한', '빛나는', '✨여신✨'];
+                        const lvColors = ['#EF9A9A', '#EC407A', '#AB47BC', '#29B6F6', '#FFD700'];
+                        ctx.fillStyle = lvColors[bLv];
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(`💎 ${lvNames[bLv]} (${echarges}회 남음)`, 15, 135);
+                    } else {
+                        ctx.fillStyle = echarges > 0 ? '#FF8F00' : '#666';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(`🍴 냠냠 ${echarges}회`, 15, 135);
+                    }
                 }
                 // 파도 이펙트 시각효과 (파란 파도 쓸려감)
                 if (this.waveEffectTimer > 0) {
