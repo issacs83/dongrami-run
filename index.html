@@ -4274,14 +4274,14 @@
                 this.player.update(inputState, deltaTime);
                 this.particles.update(deltaTime);
 
-                // 가스미 방귀 부스터: 키보드 F키 활성화
+                // 가스미 방귀 부스터: 키보드 F키 활성화 (쿨다운: 이펙트 재생 중 재발동 방지)
                 if (inputState.fart && CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'fartBoost' &&
-                    (gameState.abilityState?.fartCharges || 0) > 0) {
+                    (gameState.abilityState?.fartCharges || 0) > 0 && this.fartEffectTimer <= 0) {
                     this.activateFartBoost();
                 }
-                // 파도미 파도: 키보드 F키 활성화
+                // 파도미 파도: 키보드 F키 활성화 (쿨다운: 이펙트 재생 중 재발동 방지)
                 if (inputState.fart && CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'waveBlast' &&
-                    (gameState.abilityState?.waveCharges || 0) > 0) {
+                    (gameState.abilityState?.waveCharges || 0) > 0 && this.waveEffectTimer <= 0) {
                     this.activateWaveBlast();
                 }
                 // 비행미 비행: 키보드 F키 활성화
@@ -5097,10 +5097,8 @@
                 });
                 // 제거 이펙트 파티클
                 destroyed.forEach(d => {
-                    for (let i = 0; i < 8; i++) {
-                        this.particles.addParticle(d.x, d.y, '#66BB6A');
-                        this.particles.addParticle(d.x, d.y, '#81C784');
-                    }
+                    this.particles.createExplosion(d.x, d.y, '#66BB6A', 8);
+                    this.particles.createExplosion(d.x, d.y, '#81C784', 8);
                 });
                 // 사운드
                 audioManager.playPowerUpSound();
@@ -5134,16 +5132,14 @@
                 });
                 // 물보라 파티클
                 destroyed.forEach(d => {
-                    for (let i = 0; i < 10; i++) {
-                        this.particles.addParticle(d.x, d.y, '#29B6F6');
-                        this.particles.addParticle(d.x, d.y, '#4FC3F7');
-                    }
+                    this.particles.createExplosion(d.x, d.y, '#29B6F6', 10);
+                    this.particles.createExplosion(d.x, d.y, '#4FC3F7', 10);
                 });
                 // 추가 파도 파티클 (화면 전체)
-                for (let i = 0; i < 15; i++) {
+                for (let i = 0; i < 5; i++) {
                     const rx = Math.random() * GAME_CONFIG.width;
                     const ry = GAME_CONFIG.height - 60 + Math.random() * 40;
-                    this.particles.addParticle(rx, ry, '#81D4FA');
+                    this.particles.createExplosion(rx, ry, '#81D4FA', 3);
                 }
                 audioManager.playPowerUpSound();
             }
@@ -5165,10 +5161,10 @@
                     return;
                 }
 
-                // 파도미 파도 버튼: 우측 하단
+                // 파도미 파도 버튼: 우측 하단 (쿨다운 보호)
                 const abilityTypeWave = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
                 if (abilityTypeWave === 'waveBlast' && inputState.jumping && !gameState.isPaused &&
-                    (gameState.abilityState?.waveCharges || 0) > 0 &&
+                    (gameState.abilityState?.waveCharges || 0) > 0 && this.waveEffectTimer <= 0 &&
                     mx >= GAME_CONFIG.width - 120 && mx <= GAME_CONFIG.width - 10 &&
                     my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
                     this.activateWaveBlast();
@@ -5176,10 +5172,10 @@
                     return;
                 }
 
-                // 가스미 방귀 부스터 버튼: 우측 하단 (width-120, height-65) ~ (width-10, height-15)
+                // 가스미 방귀 부스터 버튼: 우측 하단 (쿨다운 보호)
                 const abilityType = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
                 if (abilityType === 'fartBoost' && inputState.jumping && !gameState.isPaused &&
-                    (gameState.abilityState?.fartCharges || 0) > 0 &&
+                    (gameState.abilityState?.fartCharges || 0) > 0 && this.fartEffectTimer <= 0 &&
                     mx >= GAME_CONFIG.width - 120 && mx <= GAME_CONFIG.width - 10 &&
                     my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
                     this.activateFartBoost();
