@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.14.1';
+        var CURRENT_VER = 'v3.14.2';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -4069,7 +4069,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.14.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.14.2', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -6060,13 +6060,33 @@
                 this.animTime = 0;
 
                 // ★ 랭킹보드: 이름 입력 상태 ★
-                this.nameEntered = false;
                 this.playerName = '';
-                this.showNamePrompt = false;
-                this.namePromptTimer = 2.5; // 2.5초 뒤에 이름 입력 팝업
-
-                // 최근 저장된 랭킹 순위
                 this.savedRank = -1;
+                const existingName = localStorage.getItem('dongrami_player_name') || '';
+                if (existingName) {
+                    // 이미 이름이 있으면 자동 저장 (prompt 안 뜸)
+                    this.nameEntered = true;
+                    this.playerName = existingName;
+                    this.namePromptTimer = 0;
+                    this.showNamePrompt = false;
+                    const records = Leaderboard.add({
+                        name: this.playerName,
+                        score: this.finalScore,
+                        coins: this.finalCoins,
+                        character: gameState.selectedCharacter,
+                        level: this.finalSpeedLevel,
+                        season: this.reachedSeason,
+                        time: this.playTime
+                    });
+                    this.savedRank = records.findIndex(r =>
+                        r.name === this.playerName && r.score === this.finalScore
+                    ) + 1;
+                } else {
+                    // 최초: 이름 입력 필요
+                    this.nameEntered = false;
+                    this.showNamePrompt = false;
+                    this.namePromptTimer = 2.5;
+                }
             }
 
             update(deltaTime) {
@@ -7045,7 +7065,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.14.1';
+        const GAME_VERSION = 'v3.14.2';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
