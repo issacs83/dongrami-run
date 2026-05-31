@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.13.0';
+        var CURRENT_VER = 'v3.14.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -4018,10 +4018,19 @@
                 ctx.font = 'bold 22px Arial';
                 ctx.fillText('⚙ 설정', GAME_CONFIG.width/2 + 80, 401);
 
+                // 랭킹보드 버튼
+                ctx.fillStyle = '#6C5CE7';
+                ctx.beginPath();
+                ctx.roundRect(GAME_CONFIG.width/2 - 150, 440, 300, 45, 12);
+                ctx.fill();
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText('🏆 랭킹보드', GAME_CONFIG.width/2, 463);
+
                 // 조작법 안내
                 ctx.fillStyle = '#888';
-                ctx.font = '15px Arial';
-                ctx.fillText('탭 = 점프 / 더블탭 = 더블점프 / 아래 스와이프 = 숙이기', GAME_CONFIG.width/2, 455);
+                ctx.font = '13px Arial';
+                ctx.fillText('탭 = 점프 / 더블탭 = 더블점프 / 아래 스와이프 = 숙이기', GAME_CONFIG.width/2, 505);
 
                 // 새로고침 버튼 (좌측 하단)
                 ctx.fillStyle = '#4CAF50';
@@ -4037,7 +4046,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.13.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.14.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4091,6 +4100,13 @@
                 // 설정 버튼 영역
                 if (mx >= cx + 10 && mx <= cx + 150 && my >= 375 && my <= 425) {
                     gameState.currentScene = 'settings';
+                }
+                // 랭킹보드 버튼 영역
+                if (mx >= cx - 150 && mx <= cx + 150 && my >= 440 && my <= 485) {
+                    gameState.currentScene = 'leaderboard';
+                    if (typeof engine !== 'undefined' && engine.scenes) {
+                        engine.scenes.leaderboard = new LeaderboardScene('title');
+                    }
                 }
                 // 새로고침 버튼 영역 (좌측 하단)
                 if (mx >= 15 && mx <= 125 && my >= GAME_CONFIG.height - 50 && my <= GAME_CONFIG.height - 12) {
@@ -6008,6 +6024,15 @@
 
                 // 등장 애니메이션
                 this.animTime = 0;
+
+                // ★ 랭킹보드: 이름 입력 상태 ★
+                this.nameEntered = false;
+                this.playerName = '';
+                this.showNamePrompt = false;
+                this.namePromptTimer = 2.5; // 2.5초 뒤에 이름 입력 팝업
+
+                // 최근 저장된 랭킹 순위
+                this.savedRank = -1;
             }
 
             update(deltaTime) {
@@ -6024,6 +6049,42 @@
                     }
                 }
                 this.bg.update(deltaTime * 0.1); // 배경 아주 느리게 움직임
+
+                // ★ 랭킹보드: 이름 입력 타이머 ★
+                if (!this.nameEntered && this.namePromptTimer > 0) {
+                    this.namePromptTimer -= deltaTime;
+                    if (this.namePromptTimer <= 0 && !this.showNamePrompt) {
+                        this.showNamePrompt = true;
+                        // prompt로 이름 입력 (Canvas에서는 이게 가장 깔끔)
+                        const lastUsedName = localStorage.getItem('dongrami_player_name') || '';
+                        const name = prompt(
+                            '🏆 랭킹보드에 이름을 남겨주세요!\n(최대 8글자)',
+                            lastUsedName
+                        );
+                        if (name && name.trim()) {
+                            this.playerName = name.trim().substring(0, 8);
+                            try { localStorage.setItem('dongrami_player_name', this.playerName); } catch(e) {}
+                        } else {
+                            this.playerName = '이름없음';
+                        }
+                        this.nameEntered = true;
+
+                        // 랭킹에 저장
+                        const records = Leaderboard.add({
+                            name: this.playerName,
+                            score: this.finalScore,
+                            coins: this.finalCoins,
+                            character: gameState.selectedCharacter,
+                            level: this.finalSpeedLevel,
+                            season: this.reachedSeason,
+                            time: this.playTime
+                        });
+                        // 내 순위 찾기
+                        this.savedRank = records.findIndex(r =>
+                            r.name === this.playerName && r.score === this.finalScore
+                        ) + 1;
+                    }
+                }
             }
 
             draw(ctx) {
@@ -6163,53 +6224,58 @@
                 ctx.font = 'bold 22px Arial';
                 ctx.fillText(`LV.${this.finalSpeedLevel}`, px + pw - 60, ly);
 
-                // 버튼 영역
+                // ★ 랭킹 순위 표시 ★
+                if (this.nameEntered && this.savedRank > 0) {
+                    ly += lineH + 5;
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#6C5CE7';
+                    ctx.font = 'bold 18px Arial';
+                    const rankEmoji = this.savedRank === 1 ? '🥇' : this.savedRank === 2 ? '🥈' : this.savedRank === 3 ? '🥉' : '🏆';
+                    ctx.fillText(`${rankEmoji} ${this.playerName} - 랭킹 ${this.savedRank}위!`, cx, ly);
+                }
+
+                // 버튼 영역 (3개: 다시하기, 랭킹, 메인메뉴)
                 const btnY = py + ph - 75;
-                const btnW = 180, btnH = 55;
-                const retryX = cx - btnW - 15;
-                const menuX = cx + 15;
+                const btnW = 140, btnH = 50;
+                const retryX = cx - btnW * 1.5 - 10;
+                const rankX = cx - btnW / 2;
+                const menuX = cx + btnW * 0.5 + 10;
 
                 if (this.buttonsReady) {
                     // 다시하기 버튼
                     ctx.fillStyle = '#0099FF';
-                    ctx.beginPath();
-                    ctx.roundRect(retryX, btnY, btnW, btnH, 12);
-                    ctx.fill();
+                    ctx.beginPath(); ctx.roundRect(retryX, btnY, btnW, btnH, 12); ctx.fill();
                     ctx.fillStyle = '#FFFFFF';
-                    ctx.font = 'bold 24px Arial';
+                    ctx.font = 'bold 20px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('🔄 다시하기', retryX + btnW / 2, btnY + btnH / 2);
+                    ctx.fillText('🔄 다시하기', retryX + btnW / 2, btnY + btnH / 2 + 1);
+
+                    // 랭킹 버튼
+                    ctx.fillStyle = '#6C5CE7';
+                    ctx.beginPath(); ctx.roundRect(rankX, btnY, btnW, btnH, 12); ctx.fill();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillText('🏆 랭킹', rankX + btnW / 2, btnY + btnH / 2 + 1);
 
                     // 메인메뉴 버튼
                     ctx.fillStyle = '#FF6600';
-                    ctx.beginPath();
-                    ctx.roundRect(menuX, btnY, btnW, btnH, 12);
-                    ctx.fill();
+                    ctx.beginPath(); ctx.roundRect(menuX, btnY, btnW, btnH, 12); ctx.fill();
                     ctx.fillStyle = '#FFFFFF';
-                    ctx.fillText('🏠 메인메뉴', menuX + btnW / 2, btnY + btnH / 2);
+                    ctx.fillText('🏠 메뉴', menuX + btnW / 2, btnY + btnH / 2 + 1);
                 } else {
-                    // 버튼 비활성 상태 — 대기 메시지를 버튼 위에 별도 표시
-                    ctx.fillStyle = '#AAAAAA';
-                    ctx.beginPath();
-                    ctx.roundRect(retryX, btnY, btnW, btnH, 12);
-                    ctx.fill();
-                    ctx.fillStyle = '#DDDDDD';
-                    ctx.font = 'bold 24px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('🔄 다시하기', retryX + btnW / 2, btnY + btnH / 2);
-
-                    ctx.fillStyle = '#AAAAAA';
-                    ctx.beginPath();
-                    ctx.roundRect(menuX, btnY, btnW, btnH, 12);
-                    ctx.fill();
-                    ctx.fillStyle = '#DDDDDD';
-                    ctx.font = 'bold 24px Arial';
-                    ctx.fillText('🏠 메인메뉴', menuX + btnW / 2, btnY + btnH / 2);
-
-                    // 대기 메시지를 버튼 아래에 표시 (겹침 방지)
+                    // 버튼 비활성 상태
+                    [retryX, rankX, menuX].forEach((bx, idx) => {
+                        ctx.fillStyle = '#AAAAAA';
+                        ctx.beginPath(); ctx.roundRect(bx, btnY, btnW, btnH, 12); ctx.fill();
+                        ctx.fillStyle = '#DDDDDD';
+                        ctx.font = 'bold 20px Arial';
+                        ctx.textAlign = 'center';
+                        const labels = ['🔄 다시하기', '🏆 랭킹', '🏠 메뉴'];
+                        ctx.fillText(labels[idx], bx + btnW / 2, btnY + btnH / 2 + 1);
+                    });
                     const waitSec = Math.ceil(this.inputDelay);
                     ctx.fillStyle = '#FFFFFF';
                     ctx.font = '18px Arial';
+                    ctx.textAlign = 'center';
                     ctx.fillText(`잠시만요... (${waitSec}초)`, cx, btnY + btnH + 22);
                 }
 
@@ -6228,9 +6294,10 @@
                 const cx = GAME_CONFIG.width / 2;
                 const pw = 480, ph = 500;
                 const btnY = 40 + ph - 75;
-                const btnW = 180, btnH = 55;
-                const retryX = cx - btnW - 15;
-                const menuX = cx + 15;
+                const btnW = 140, btnH = 50;
+                const retryX = cx - btnW * 1.5 - 10;
+                const rankX = cx - btnW / 2;
+                const menuX = cx + btnW * 0.5 + 10;
 
                 // 다시하기 버튼
                 if (mx >= retryX && mx <= retryX + btnW && my >= btnY && my <= btnY + btnH) {
@@ -6268,6 +6335,13 @@
                         engine.scenes.gameOver = null;
                     }
                 }
+                // 랭킹 버튼
+                else if (mx >= rankX && mx <= rankX + btnW && my >= btnY && my <= btnY + btnH) {
+                    gameState.currentScene = 'leaderboard';
+                    if (typeof engine !== 'undefined' && engine.scenes) {
+                        engine.scenes.leaderboard = new LeaderboardScene('gameOver');
+                    }
+                }
                 // 메인메뉴 버튼
                 else if (mx >= menuX && mx <= menuX + btnW && my >= btnY && my <= btnY + btnH) {
                     gameState.currentScene = 'title';
@@ -6279,6 +6353,218 @@
                     }
                 }
                 // 버튼 밖 터치는 무시 (실수 방지)
+            }
+        }
+
+        // ============================================================================
+        // LEADERBOARD SYSTEM (랭킹보드)
+        // ============================================================================
+        const Leaderboard = {
+            KEY: 'dongrami_leaderboard',
+            getAll() {
+                try {
+                    return JSON.parse(localStorage.getItem(this.KEY) || '[]');
+                } catch(e) { return []; }
+            },
+            add(entry) {
+                const records = this.getAll();
+                records.push({
+                    name: entry.name || '???',
+                    score: entry.score || 0,
+                    coins: entry.coins || 0,
+                    character: entry.character || '동그라미',
+                    level: entry.level || 0,
+                    season: entry.season || '봄',
+                    time: entry.time || 0,
+                    date: new Date().toLocaleDateString('ko-KR')
+                });
+                // 점수 내림차순 정렬, 최대 100개 보관
+                records.sort((a, b) => b.score - a.score);
+                if (records.length > 100) records.length = 100;
+                try { localStorage.setItem(this.KEY, JSON.stringify(records)); } catch(e) {}
+                return records;
+            },
+            clear() {
+                try { localStorage.removeItem(this.KEY); } catch(e) {}
+            }
+        };
+
+        // ============================================================================
+        // LEADERBOARD SCENE (랭킹보드 화면)
+        // ============================================================================
+        class LeaderboardScene {
+            constructor(returnTo) {
+                this.returnTo = returnTo || 'title'; // 돌아갈 씬
+                this.records = Leaderboard.getAll();
+                this.scrollY = 0;
+                this.maxScroll = Math.max(0, this.records.length * 42 - 320);
+                this.bg = new Background();
+                this.animTime = 0;
+            }
+
+            update(deltaTime) {
+                this.animTime += deltaTime;
+                this.bg.update(deltaTime * 0.1);
+            }
+
+            draw(ctx) {
+                this.bg.draw(ctx);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+
+                ctx.save();
+                const cx = GAME_CONFIG.width / 2;
+                const pw = 520, ph = 520;
+                const px = cx - pw / 2, py = 20;
+
+                // 패널
+                const panelAlpha = Math.min(1, this.animTime / 0.4);
+                ctx.globalAlpha = panelAlpha;
+                ctx.fillStyle = 'rgba(255,255,255,0.96)';
+                ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 20); ctx.fill();
+                ctx.strokeStyle = '#6C5CE7'; ctx.lineWidth = 3; ctx.stroke();
+
+                // 제목
+                ctx.fillStyle = '#6C5CE7';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('🏆 랭킹보드', cx, py + 45);
+
+                // 헤더
+                const headerY = py + 75;
+                ctx.fillStyle = '#6C5CE7';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText('순위', px + 20, headerY);
+                ctx.fillText('이름', px + 65, headerY);
+                ctx.fillText('캐릭터', px + 180, headerY);
+                ctx.fillText('점수', px + 290, headerY);
+                ctx.fillText('레벨', px + 380, headerY);
+                ctx.fillText('날짜', px + 430, headerY);
+
+                // 구분선
+                ctx.strokeStyle = '#EEE'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(px + 15, headerY + 12); ctx.lineTo(px + pw - 15, headerY + 12); ctx.stroke();
+
+                // 기록 목록 (클리핑)
+                const listY = headerY + 20;
+                const listH = 350;
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(px, listY, pw, listH);
+                ctx.clip();
+
+                if (this.records.length === 0) {
+                    ctx.fillStyle = '#AAA';
+                    ctx.font = '20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('아직 기록이 없어요!', cx, listY + 80);
+                    ctx.fillText('게임을 플레이하면 기록이 쌓여요 🎮', cx, listY + 115);
+                } else {
+                    const rowH = 42;
+                    this.records.forEach((r, i) => {
+                        const ry = listY + i * rowH - this.scrollY + 5;
+                        if (ry < listY - rowH || ry > listY + listH) return;
+
+                        // 배경 줄무늬
+                        if (i % 2 === 0) {
+                            ctx.fillStyle = 'rgba(108,92,231,0.04)';
+                            ctx.fillRect(px + 10, ry - 8, pw - 20, rowH);
+                        }
+
+                        // 순위 메달
+                        ctx.font = 'bold 16px Arial';
+                        ctx.textAlign = 'left';
+                        if (i === 0) { ctx.fillStyle = '#FFD700'; ctx.fillText('🥇', px + 20, ry + 12); }
+                        else if (i === 1) { ctx.fillStyle = '#C0C0C0'; ctx.fillText('🥈', px + 20, ry + 12); }
+                        else if (i === 2) { ctx.fillStyle = '#CD7F32'; ctx.fillText('🥉', px + 20, ry + 12); }
+                        else { ctx.fillStyle = '#888'; ctx.font = '14px Arial'; ctx.fillText(`${i + 1}`, px + 24, ry + 12); }
+
+                        // 이름
+                        ctx.fillStyle = '#333';
+                        ctx.font = i < 3 ? 'bold 15px Arial' : '14px Arial';
+                        const displayName = r.name.length > 6 ? r.name.substring(0, 6) + '..' : r.name;
+                        ctx.fillText(displayName, px + 65, ry + 12);
+
+                        // 캐릭터
+                        ctx.fillStyle = '#666';
+                        ctx.font = '13px Arial';
+                        const charName = r.character.length > 4 ? r.character.substring(0, 4) + '..' : r.character;
+                        ctx.fillText(charName, px + 180, ry + 12);
+
+                        // 점수
+                        ctx.fillStyle = i < 3 ? '#0066CC' : '#444';
+                        ctx.font = i < 3 ? 'bold 15px Arial' : '14px Arial';
+                        ctx.fillText(`${r.score}`, px + 290, ry + 12);
+
+                        // 레벨
+                        ctx.fillStyle = '#888';
+                        ctx.font = '13px Arial';
+                        ctx.fillText(`Lv.${r.level}`, px + 380, ry + 12);
+
+                        // 날짜
+                        ctx.fillStyle = '#AAA';
+                        ctx.font = '11px Arial';
+                        ctx.fillText(r.date || '', px + 430, ry + 12);
+                    });
+                }
+                ctx.restore();
+
+                // 스크롤 인디케이터
+                if (this.maxScroll > 0) {
+                    const scrollBarH = listH * (listH / (this.records.length * 42));
+                    const scrollBarY = listY + (this.scrollY / this.maxScroll) * (listH - scrollBarH);
+                    ctx.fillStyle = 'rgba(108,92,231,0.3)';
+                    ctx.beginPath(); ctx.roundRect(px + pw - 12, scrollBarY, 5, scrollBarH, 3); ctx.fill();
+                }
+
+                // 기록 수
+                ctx.fillStyle = '#AAA';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`총 ${this.records.length}개의 기록`, px + 20, py + ph - 55);
+
+                // 돌아가기 버튼
+                const btnW = 160, btnH = 45;
+                const btnX = cx - btnW / 2, btnY = py + ph - 50;
+                ctx.fillStyle = '#6C5CE7';
+                ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 12); ctx.fill();
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('← 돌아가기', cx, btnY + btnH / 2 + 1);
+
+                ctx.restore();
+            }
+
+            handleInput(inputState) {
+                if (!inputState.jumping) return;
+                const mx = inputManager.lastTouchX;
+                const my = inputManager.lastTouchY;
+                if (mx === undefined || my === undefined) return;
+
+                const cx = GAME_CONFIG.width / 2;
+                const btnW = 160, btnH = 45;
+                const btnX = cx - btnW / 2;
+                const btnY = 20 + 520 - 50;
+
+                if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
+                    gameState.currentScene = this.returnTo;
+                    if (typeof engine !== 'undefined' && engine.scenes) {
+                        engine.scenes.leaderboard = null;
+                    }
+                }
+
+                // 스크롤 (위/아래 영역 터치)
+                const listY = 20 + 75 + 20;
+                const listH = 350;
+                if (my >= listY && my <= listY + listH) {
+                    if (my < listY + listH / 2) {
+                        this.scrollY = Math.max(0, this.scrollY - 80);
+                    } else {
+                        this.scrollY = Math.min(this.maxScroll, this.scrollY + 80);
+                    }
+                }
             }
         }
 
@@ -6525,7 +6811,8 @@
                     settings: new SettingsScene(),
                     game: null,
                     gameOver: null,
-                    ending: null
+                    ending: null,
+                    leaderboard: null
                 };
                 this.lastTime = 0; // rAF timestamp로 초기화됨
                 this.prevScene = 'title';
@@ -6582,6 +6869,12 @@
                         }
                         this.scenes.ending.update(deltaTime);
                         this.scenes.ending.handleInput(inputState);
+                    } else if (gameState.currentScene === 'leaderboard') {
+                        if (!this.scenes.leaderboard) {
+                            this.scenes.leaderboard = new LeaderboardScene('title');
+                        }
+                        this.scenes.leaderboard.update(deltaTime);
+                        this.scenes.leaderboard.handleInput(inputState);
                     }
 
                     // Draw
@@ -6600,6 +6893,8 @@
                         this.scenes.gameOver.draw(this.ctx);
                     } else if (gameState.currentScene === 'ending' && this.scenes.ending) {
                         this.scenes.ending.draw(this.ctx);
+                    } else if (gameState.currentScene === 'leaderboard' && this.scenes.leaderboard) {
+                        this.scenes.leaderboard.draw(this.ctx);
                     }
 
                     // 매 프레임 점프 입력 리셋 (모든 씬에서)
@@ -6716,7 +7011,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.13.0';
+        const GAME_VERSION = 'v3.14.0';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
