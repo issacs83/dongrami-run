@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.14.0';
+        var CURRENT_VER = 'v3.14.1';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -38,15 +38,18 @@
     (function() {
         try {
             var flyKey = 'dongrami_fly_hack';
+            var flyOnKey = 'dongrami_fly_hack_on';
             var countKey = 'dongrami_refresh_count';
             var count = parseInt(localStorage.getItem(countKey) || '0') + 1;
             localStorage.setItem(countKey, String(count));
             if (count >= 50 && !localStorage.getItem(flyKey)) {
                 localStorage.setItem(flyKey, 'activated');
+                localStorage.setItem(flyOnKey, 'true');
             }
-            window.__flyHackActive = !!localStorage.getItem(flyKey);
+            window.__flyHackEnabled = !!localStorage.getItem(flyKey);
+            window.__flyHackActive = window.__flyHackEnabled && localStorage.getItem(flyOnKey) === 'true';
             window.__flyHackRefreshCount = count;
-        } catch(e) { window.__flyHackActive = false; window.__flyHackRefreshCount = 0; }
+        } catch(e) { window.__flyHackEnabled = false; window.__flyHackActive = false; window.__flyHackRefreshCount = 0; }
     })();
     </script>
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -4042,11 +4045,31 @@
                 ctx.textAlign = 'center';
                 ctx.fillText('🔄 새로고침', 70, GAME_CONFIG.height - 31);
 
+                // ★ 핵 ON/OFF 버튼 (자격 있는 유저에게만 표시) ★
+                if (window.__flyHackEnabled) {
+                    const hackOn = window.__flyHackActive;
+                    const hbX = GAME_CONFIG.width - 145, hbY = GAME_CONFIG.height - 50;
+                    const hbW = 130, hbH = 38;
+
+                    ctx.fillStyle = hackOn ? '#FF1744' : '#00C853';
+                    ctx.beginPath(); ctx.roundRect(hbX, hbY, hbW, hbH, 10); ctx.fill();
+
+                    // 테두리 반짝임
+                    ctx.strokeStyle = hackOn ? 'rgba(255,23,68,0.5)' : 'rgba(0,200,83,0.5)';
+                    ctx.lineWidth = 2 + Math.sin(Date.now() * 0.005) * 1;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(hackOn ? '🚀 핵 끄기' : '🚀 핵 켜기', hbX + hbW / 2, hbY + hbH / 2 + 1);
+                }
+
                 // 버전 표시 (우측 하단)
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.14.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.14.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4106,6 +4129,17 @@
                     gameState.currentScene = 'leaderboard';
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.leaderboard = new LeaderboardScene('title');
+                    }
+                }
+                // ★ 핵 ON/OFF 버튼 ★
+                if (window.__flyHackEnabled) {
+                    const hbX = GAME_CONFIG.width - 145, hbY = GAME_CONFIG.height - 50;
+                    const hbW = 130, hbH = 38;
+                    if (mx >= hbX && mx <= hbX + hbW && my >= hbY && my <= hbY + hbH) {
+                        window.__flyHackActive = !window.__flyHackActive;
+                        try {
+                            localStorage.setItem('dongrami_fly_hack_on', window.__flyHackActive ? 'true' : 'false');
+                        } catch(e) {}
                     }
                 }
                 // 새로고침 버튼 영역 (좌측 하단)
@@ -7011,7 +7045,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.14.0';
+        const GAME_VERSION = 'v3.14.1';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
