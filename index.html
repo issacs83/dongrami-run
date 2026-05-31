@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.12.0';
+        var CURRENT_VER = 'v3.13.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -33,6 +33,20 @@
                 localStorage.setItem('dongrami_version', CURRENT_VER);
             }
         } catch(e) {}
+    })();
+    // ★ 플라이 핵: 새로고침 50회 감지 ★
+    (function() {
+        try {
+            var flyKey = 'dongrami_fly_hack';
+            var countKey = 'dongrami_refresh_count';
+            var count = parseInt(localStorage.getItem(countKey) || '0') + 1;
+            localStorage.setItem(countKey, String(count));
+            if (count >= 50 && !localStorage.getItem(flyKey)) {
+                localStorage.setItem(flyKey, 'activated');
+            }
+            window.__flyHackActive = !!localStorage.getItem(flyKey);
+            window.__flyHackRefreshCount = count;
+        } catch(e) { window.__flyHackActive = false; window.__flyHackRefreshCount = 0; }
     })();
     </script>
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -4023,7 +4037,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.12.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.13.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4740,6 +4754,83 @@
                         this.player.isJumping = true;
                     }
                 }
+                // ═══════════════════════════════════════════════
+                // ★ 플라이 핵 (새로고침 50회 이스터에그) ★
+                // ═══════════════════════════════════════════════
+                if (window.__flyHackActive) {
+                    if (!this.flyHackState) {
+                        // 초기화: 10분(600초) 비행으로 시작
+                        this.flyHackState = {
+                            isFlying: true,
+                            flyTimer: 600,    // 10분 비행
+                            groundTimer: 0,   // 5분 대기
+                            justActivated: true,
+                            bannerTimer: 5    // 활성화 배너 5초
+                        };
+                    }
+                    const fh = this.flyHackState;
+
+                    // 활성화 배너 타이머
+                    if (fh.bannerTimer > 0) fh.bannerTimer -= deltaTime;
+
+                    if (fh.isFlying) {
+                        // ★ 비행 중 ★
+                        fh.flyTimer -= deltaTime;
+                        this.player.velocityY = 0;
+                        this.player.isJumping = false;
+
+                        // 위로 떠오르기 + 물결 움직임
+                        if (inputState.jumping) {
+                            this.player.y -= 5;
+                        } else if (inputState.ducking) {
+                            this.player.y += 5;
+                        } else {
+                            // 부드러운 떠다니기
+                            this.player.y += Math.sin(Date.now() * 0.002) * 0.8;
+                        }
+                        // 화면 밖 방지
+                        if (this.player.y < 10) this.player.y = 10;
+                        if (this.player.y + this.player.height > GAME_CONFIG.groundY) {
+                            this.player.y = GAME_CONFIG.groundY - this.player.height;
+                        }
+                        // 비행 중 무적
+                        gameState.invulnTimer = 0.5;
+
+                        // 비행 중 파티클 (날개짓 효과)
+                        if (Math.random() < 0.15) {
+                            const px = this.player.x + 32;
+                            const py = this.player.y + this.player.height;
+                            const sparkColors = ['#00E5FF', '#18FFFF', '#84FFFF', '#B2EBF2', '#E0F7FA'];
+                            this.particles.particles.push({
+                                x: px + (Math.random() - 0.5) * 30,
+                                y: py + Math.random() * 10,
+                                vx: -1 - Math.random() * 2,
+                                vy: 1 + Math.random(),
+                                life: 0.8,
+                                color: sparkColors[Math.floor(Math.random() * sparkColors.length)],
+                                size: 2 + Math.random() * 3,
+                                isStar: Math.random() > 0.5
+                            });
+                        }
+
+                        // 10분 끝 → 착지
+                        if (fh.flyTimer <= 0) {
+                            fh.isFlying = false;
+                            fh.groundTimer = 300; // 5분 대기
+                            fh.bannerTimer = 3;
+                            this.player.isJumping = true;
+                        }
+                    } else {
+                        // ★ 대기 중 (5분) ★
+                        fh.groundTimer -= deltaTime;
+                        if (fh.groundTimer <= 0) {
+                            fh.isFlying = true;
+                            fh.flyTimer = 600; // 다시 10분 비행
+                            fh.bannerTimer = 3;
+                        }
+                    }
+                }
+
                 // 방귀 이펙트 타이머 감소
                 if (this.fartEffectTimer > 0) this.fartEffectTimer -= deltaTime;
                 // 파도 이펙트 타이머 감소
@@ -5636,6 +5727,70 @@
                 // 계절 전환 오버레이 (BGM 크로스페이드 + 시각 효과)
                 if (typeof seasonalBGM !== 'undefined') {
                     seasonalBGM.drawOverlay(ctx);
+                }
+
+                // ═══ 플라이 핵 HUD & 배너 ═══
+                if (window.__flyHackActive && this.flyHackState) {
+                    const fh = this.flyHackState;
+                    ctx.save();
+
+                    // 활성화/상태 전환 배너
+                    if (fh.bannerTimer > 0) {
+                        const bannerAlpha = Math.min(1, fh.bannerTimer * 0.5);
+                        ctx.globalAlpha = bannerAlpha;
+
+                        // 배경
+                        ctx.fillStyle = fh.isFlying ? 'rgba(0,229,255,0.3)' : 'rgba(255,152,0,0.3)';
+                        ctx.fillRect(0, GAME_CONFIG.height * 0.35, GAME_CONFIG.width, 60);
+
+                        // 텍스트
+                        ctx.fillStyle = '#FFF';
+                        ctx.font = 'bold 24px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.shadowColor = fh.isFlying ? '#00E5FF' : '#FF9800';
+                        ctx.shadowBlur = 15;
+
+                        if (fh.justActivated) {
+                            ctx.fillText('🚀 FLY HACK ACTIVATED 🚀', GAME_CONFIG.width / 2, GAME_CONFIG.height * 0.35 + 38);
+                            if (fh.bannerTimer <= 0) fh.justActivated = false;
+                        } else if (fh.isFlying) {
+                            ctx.fillText('🕊️ 비행 모드 ON', GAME_CONFIG.width / 2, GAME_CONFIG.height * 0.35 + 38);
+                        } else {
+                            ctx.fillText('⏳ 착지 대기...', GAME_CONFIG.width / 2, GAME_CONFIG.height * 0.35 + 38);
+                        }
+                        ctx.shadowBlur = 0;
+                        ctx.globalAlpha = 1;
+                    }
+
+                    // HUD: 좌측 하단에 비행/대기 타이머
+                    const hudY = GAME_CONFIG.height - 30;
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'left';
+
+                    if (fh.isFlying) {
+                        const mins = Math.floor(fh.flyTimer / 60);
+                        const secs = Math.floor(fh.flyTimer % 60);
+                        // 비행 중 인디케이터
+                        ctx.fillStyle = 'rgba(0,229,255,0.7)';
+                        ctx.fillRect(10, hudY - 12, 140, 18);
+                        ctx.fillStyle = '#FFF';
+                        ctx.fillText(`🚀 비행 ${mins}:${secs.toString().padStart(2, '0')} 남음`, 15, hudY);
+
+                        // 비행 중 화면 가장자리 글로우
+                        const glowAlpha = 0.05 + Math.sin(Date.now() * 0.003) * 0.03;
+                        ctx.fillStyle = `rgba(0,229,255,${glowAlpha})`;
+                        ctx.fillRect(0, 0, GAME_CONFIG.width, 5);
+                        ctx.fillRect(0, GAME_CONFIG.height - 5, GAME_CONFIG.width, 5);
+                    } else {
+                        const mins = Math.floor(fh.groundTimer / 60);
+                        const secs = Math.floor(fh.groundTimer % 60);
+                        ctx.fillStyle = 'rgba(255,152,0,0.7)';
+                        ctx.fillRect(10, hudY - 12, 140, 18);
+                        ctx.fillStyle = '#FFF';
+                        ctx.fillText(`⏳ 대기 ${mins}:${secs.toString().padStart(2, '0')} 남음`, 15, hudY);
+                    }
+
+                    ctx.restore();
                 }
             }
 
@@ -6561,7 +6716,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.12.0';
+        const GAME_VERSION = 'v3.13.0';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
