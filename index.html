@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.17.0';
+        var CURRENT_VER = 'v3.17.1';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -4163,23 +4163,24 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.17.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.17.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
-                // ★ 숨겨진 큰코인 (매번 랜덤 위치 — 잘 찾아보세요!) ★
+                // ★ 숨겨진 큰코인 (매번 랜덤 위치 — 꽁꽁 숨어 있음!) ★
                 if (this.bigCoinVisible) {
-                    const tw = Math.sin(this.charFrame * 2) * 0.5 + 0.5;
-                    ctx.globalAlpha = 0.75;
+                    // 평소엔 거의 안 보이게(알파 0.13), 약 5초에 한 번만 0.5초간 살짝 반짝
+                    const cycle = this.charFrame % 15; // charFrame은 프레임당 0.05씩 증가 → 15 ≈ 5초
+                    const glint = cycle > 14.2 ? Math.sin((cycle - 14.2) / 0.8 * Math.PI) : 0;
+                    ctx.globalAlpha = 0.13 + glint * 0.45;
                     ctx.fillStyle = '#FFC107';
-                    ctx.beginPath(); ctx.arc(this.bigCoinX, this.bigCoinY, 11, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = '#FF8F00'; ctx.lineWidth = 2;
-                    ctx.beginPath(); ctx.arc(this.bigCoinX, this.bigCoinY, 11, 0, Math.PI * 2); ctx.stroke();
-                    ctx.fillStyle = 'rgba(255,224,130,0.9)';
-                    ctx.beginPath(); ctx.arc(this.bigCoinX - 3, this.bigCoinY - 3, 3.5, 0, Math.PI * 2); ctx.fill();
-                    ctx.globalAlpha = 0.4 + tw * 0.6;
-                    ctx.fillStyle = '#FFF8E1';
-                    ctx.font = 'bold 10px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('★', this.bigCoinX, this.bigCoinY + 3.5);
+                    ctx.beginPath(); ctx.arc(this.bigCoinX, this.bigCoinY, 8, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,224,130,0.8)';
+                    ctx.beginPath(); ctx.arc(this.bigCoinX - 2, this.bigCoinY - 2, 2.5, 0, Math.PI * 2); ctx.fill();
+                    if (glint > 0.3) {
+                        ctx.fillStyle = '#FFF8E1';
+                        ctx.font = 'bold 9px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('✦', this.bigCoinX, this.bigCoinY + 3);
+                    }
                     ctx.globalAlpha = 1;
                 }
 
@@ -7457,7 +7458,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.17.0';
+        const GAME_VERSION = 'v3.17.1';
         if ('serviceWorker' in navigator) {
             // 첫 설치 직후 불필요한 새로고침 방지용: 등록 전에 컨트롤러 존재 여부 기억
             const hadController = !!navigator.serviceWorker.controller;
