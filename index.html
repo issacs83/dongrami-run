@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.16.0';
+        var CURRENT_VER = 'v3.17.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1927,6 +1927,7 @@
                 }
             })(),
             totalCoins: (() => { const v = parseInt(localStorage.getItem('totalCoins')); return isNaN(v) ? 300 : v; })(),
+            bigCoins: (() => { const v = parseInt(localStorage.getItem('bigCoins')); return isNaN(v) ? 0 : v; })(), // 💰 큰코인 (1개 = 5000코인)
             totalGames: parseInt(localStorage.getItem('totalGames')) || 0,
             gameSpeed: GAME_CONFIG.initialSpeed,
             speedLevel: 0,
@@ -4012,6 +4013,24 @@
                 this.bounceSpeed = 0.3;
                 this.charFrame = 0;
                 this.bg = new Background();
+                // ★ 숨겨진 큰코인 (보물찾기) ★
+                this.msg = '';
+                this.msgTimer = 0;
+                this.respawnBigCoin();
+            }
+
+            // 큰코인 랜덤 위치 재배치 (중앙 패널/하단 버튼줄 피해서)
+            respawnBigCoin() {
+                const W = GAME_CONFIG.width;
+                this.bigCoinX = 100; this.bigCoinY = 100;
+                for (let i = 0; i < 60; i++) {
+                    const x = 30 + Math.random() * (W - 60);
+                    const y = 30 + Math.random() * 485; // 하단 버튼줄(515+) 제외
+                    const inPanel = x > 218 && x < W - 218 && y > 26 && y < 544; // 중앙 패널 회피
+                    const inCoinUi = x < 200 && y < 100; // 좌측 상단 큰코인 UI 회피
+                    if (!inPanel && !inCoinUi) { this.bigCoinX = x; this.bigCoinY = y; break; }
+                }
+                this.bigCoinVisible = true;
             }
 
             update(deltaTime) {
@@ -4019,6 +4038,7 @@
                 if (this.bounceY > 15 || this.bounceY < 0) this.bounceSpeed *= -1;
                 this.charFrame += 0.05;
                 this.bg.update(deltaTime * 0.3);
+                if (this.msgTimer > 0) this.msgTimer -= deltaTime;
             }
 
             draw(ctx) {
@@ -4143,7 +4163,57 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.16.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.17.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+
+                // ★ 숨겨진 큰코인 (매번 랜덤 위치 — 잘 찾아보세요!) ★
+                if (this.bigCoinVisible) {
+                    const tw = Math.sin(this.charFrame * 2) * 0.5 + 0.5;
+                    ctx.globalAlpha = 0.75;
+                    ctx.fillStyle = '#FFC107';
+                    ctx.beginPath(); ctx.arc(this.bigCoinX, this.bigCoinY, 11, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#FF8F00'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(this.bigCoinX, this.bigCoinY, 11, 0, Math.PI * 2); ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,224,130,0.9)';
+                    ctx.beginPath(); ctx.arc(this.bigCoinX - 3, this.bigCoinY - 3, 3.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 0.4 + tw * 0.6;
+                    ctx.fillStyle = '#FFF8E1';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('★', this.bigCoinX, this.bigCoinY + 3.5);
+                    ctx.globalAlpha = 1;
+                }
+
+                // ★ 큰코인 보유량 + 교환 버튼 (좌측 상단) ★
+                if ((gameState.bigCoins || 0) > 0) {
+                    ctx.textAlign = 'left';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillStyle = '#B8860B';
+                    ctx.fillText(`💰 큰코인 ${gameState.bigCoins}개`, 15, 34);
+                    ctx.fillStyle = '#FFB300';
+                    ctx.beginPath(); ctx.roundRect(15, 48, 170, 32, 8); ctx.fill();
+                    ctx.strokeStyle = '#FF8F00'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.roundRect(15, 48, 170, 32, 8); ctx.stroke();
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = 'bold 13px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🪙 코인으로 바꾸기', 100, 68);
+                    ctx.font = '10px Arial';
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                    ctx.fillText('1개 = 5,000코인', 100, 92);
+                }
+
+                // ★ 큰코인 안내 메시지 (상단 중앙) ★
+                if (this.msgTimer > 0 && this.msg) {
+                    ctx.globalAlpha = Math.min(1, this.msgTimer);
+                    ctx.font = 'bold 16px Arial';
+                    const mw = ctx.measureText(this.msg).width + 40;
+                    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+                    ctx.beginPath(); ctx.roundRect(GAME_CONFIG.width/2 - mw/2, 6, mw, 30, 15); ctx.fill();
+                    ctx.fillStyle = '#FFD54F';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.msg, GAME_CONFIG.width/2, 26);
+                    ctx.globalAlpha = 1;
+                }
 
                 ctx.restore();
             }
@@ -4155,6 +4225,35 @@
                 if (mx === undefined || my === undefined) return;
 
                 const cx = GAME_CONFIG.width / 2;
+
+                // ★ 숨겨진 큰코인 터치 판정 (버튼보다 먼저) ★
+                if (this.bigCoinVisible && Math.hypot(mx - this.bigCoinX, my - this.bigCoinY) <= 26) {
+                    this.bigCoinVisible = false;
+                    gameState.bigCoins = (gameState.bigCoins || 0) + 1;
+                    try { localStorage.setItem('bigCoins', gameState.bigCoins); } catch(e) {}
+                    this.msg = '💰 큰코인 발견! +1 (보유 ' + gameState.bigCoins + '개)';
+                    this.msgTimer = 2.5;
+                    audioManager.playCoinSound();
+                    inputManager.resetJump();
+                    return;
+                }
+
+                // ★ 큰코인 → 일반 코인 교환 버튼 ★
+                if ((gameState.bigCoins || 0) > 0 && mx >= 15 && mx <= 185 && my >= 48 && my <= 80) {
+                    const n = gameState.bigCoins;
+                    gameState.totalCoins += n * 5000;
+                    gameState.bigCoins = 0;
+                    try {
+                        localStorage.setItem('totalCoins', gameState.totalCoins);
+                        localStorage.setItem('bigCoins', '0');
+                    } catch(e) {}
+                    this.msg = '💰 큰코인 ' + n + '개 → 🪙 ' + (n * 5000).toLocaleString() + '코인 교환 완료!';
+                    this.msgTimer = 3;
+                    audioManager.playPowerUpSound();
+                    inputManager.resetJump();
+                    return;
+                }
+
                 // 게임 시작 버튼 영역
                 if (mx >= cx - 150 && mx <= cx + 150 && my >= 290 && my <= 355) {
                     gameState.score = 0;
@@ -7156,6 +7255,10 @@
                         inputManager.jumping = false;
                         inputManager.jumpPressed = false;
                         this.prevScene = gameState.currentScene;
+                        // 타이틀로 돌아올 때마다 숨겨진 큰코인 위치 재배치
+                        if (gameState.currentScene === 'title' && this.scenes.title && this.scenes.title.respawnBigCoin) {
+                            this.scenes.title.respawnBigCoin();
+                        }
                     }
 
                     // Update
@@ -7354,7 +7457,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.16.0';
+        const GAME_VERSION = 'v3.17.0';
         if ('serviceWorker' in navigator) {
             // 첫 설치 직후 불필요한 새로고침 방지용: 등록 전에 컨트롤러 존재 여부 기억
             const hadController = !!navigator.serviceWorker.controller;
