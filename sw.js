@@ -1,5 +1,5 @@
-// 동그라미 런 Service Worker v3.11.5
-const CACHE_VERSION = 'v3.11.5';
+// 동그라미 런 Service Worker v3.15.0
+const CACHE_VERSION = 'v3.15.0';
 const CACHE_NAME = 'dongrami-run-' + CACHE_VERSION;
 const ASSETS = [
     '/dongrami-run/',
@@ -8,12 +8,13 @@ const ASSETS = [
     '/dongrami-run/og-image.png'
 ];
 
-// 설치 시 핵심 파일 캐시 + 즉시 활성화
+// 설치 시 핵심 파일 캐시 (HTTP 캐시 우회를 위해 cache: 'reload')
+// ※ skipWaiting은 install에서 자동 호출하지 않음 — 게임 도중 강제 새로고침 방지.
+//    새 버전은 업데이트 배너를 탭했을 때(메시지 수신 시) 활성화된다.
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(ASSETS))
-            .then(() => self.skipWaiting()) // 대기 없이 즉시 활성화
+            .then(cache => cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' }))))
     );
 });
 

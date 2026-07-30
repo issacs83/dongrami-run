@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.14.2';
+        var CURRENT_VER = 'v3.15.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -24,10 +24,10 @@
                     caches.keys().then(function(names) {
                         names.forEach(function(name) { caches.delete(name); });
                     }).then(function() {
-                        window.location.reload(true);
+                        window.location.reload();
                     });
                 } else {
-                    window.location.reload(true);
+                    window.location.reload();
                 }
             } else if (!savedVer) {
                 localStorage.setItem('dongrami_version', CURRENT_VER);
@@ -1822,7 +1822,7 @@
             // ★ 코인 이벤트 1: 100,000코인 지급
             _coinEvent1: (() => {
                 const eventKey = 'coinEvent_20260322';
-                if (!localStorage.getItem(eventKey)) {
+                if (localStorage.getItem('dongramiRunInitialized') && !localStorage.getItem(eventKey)) {
                     const current = parseInt(localStorage.getItem('totalCoins')) || 300;
                     localStorage.setItem('totalCoins', current + 100000);
                     localStorage.setItem(eventKey, 'claimed');
@@ -1831,7 +1831,7 @@
             // ★ 코인 이벤트 2: 20,000,000코인 추가 지급!
             _coinEvent2: (() => {
                 const eventKey = 'coinEvent_20260322_v2';
-                if (!localStorage.getItem(eventKey)) {
+                if (localStorage.getItem('dongramiRunInitialized') && !localStorage.getItem(eventKey)) {
                     const current = parseInt(localStorage.getItem('totalCoins')) || 300;
                     localStorage.setItem('totalCoins', current + 20000000);
                     localStorage.setItem(eventKey, 'claimed');
@@ -1840,7 +1840,7 @@
             // ★ 코인 이벤트 3: 1,000,000코인 추가 지급!
             _coinEvent3: (() => {
                 const eventKey = 'coinEvent_20260322_v3';
-                if (!localStorage.getItem(eventKey)) {
+                if (localStorage.getItem('dongramiRunInitialized') && !localStorage.getItem(eventKey)) {
                     const current = parseInt(localStorage.getItem('totalCoins')) || 300;
                     localStorage.setItem('totalCoins', current + 1000000);
                     localStorage.setItem(eventKey, 'claimed');
@@ -1849,7 +1849,7 @@
             // ★ 코인 이벤트 4: 10,000,000코인 지급!
             _coinEvent4: (() => {
                 const eventKey = 'coinEvent_20260322_v4';
-                if (!localStorage.getItem(eventKey)) {
+                if (localStorage.getItem('dongramiRunInitialized') && !localStorage.getItem(eventKey)) {
                     const current = parseInt(localStorage.getItem('totalCoins')) || 300;
                     localStorage.setItem('totalCoins', current + 10000000);
                     localStorage.setItem(eventKey, 'claimed');
@@ -1858,13 +1858,13 @@
             // ★ 코인 이벤트 5 (찐막): 1,000,000,000코인 지급!! 🎉
             _coinEvent5: (() => {
                 const eventKey = 'coinEvent_20260322_v5';
-                if (!localStorage.getItem(eventKey)) {
+                if (localStorage.getItem('dongramiRunInitialized') && !localStorage.getItem(eventKey)) {
                     const current = parseInt(localStorage.getItem('totalCoins')) || 300;
                     localStorage.setItem('totalCoins', current + 1000000000);
                     localStorage.setItem(eventKey, 'claimed');
                 }
             })(),
-            totalCoins: parseInt(localStorage.getItem('totalCoins')) || 300,
+            totalCoins: (() => { const v = parseInt(localStorage.getItem('totalCoins')); return isNaN(v) ? 300 : v; })(),
             totalGames: parseInt(localStorage.getItem('totalGames')) || 0,
             gameSpeed: GAME_CONFIG.initialSpeed,
             speedLevel: 0,
@@ -1878,7 +1878,8 @@
                 return (saved && spriteConfig.sprites[saved]) ? saved : Object.keys(spriteConfig.sprites)[0];
             })(),
             unlockedCharacters: (() => {
-                const saved = JSON.parse(localStorage.getItem('unlockedCharacters') || 'null');
+                let saved = null;
+                try { saved = JSON.parse(localStorage.getItem('unlockedCharacters') || 'null'); } catch(e) { /* 손상된 저장값 방어 */ }
                 const firstKey = Object.keys(spriteConfig.sprites)[0];
                 return (saved && Array.isArray(saved)) ? saved : [firstKey];
             })(),
@@ -1886,8 +1887,8 @@
             gameTime: 0,
             winterCount: 0,
             seasonLevel: 0,
-            bgmVolume: parseFloat(localStorage.getItem('bgmVolume')) || 1.0,   // 0~1
-            sfxVolume: parseFloat(localStorage.getItem('sfxVolume')) || 1.0,    // 0~1
+            bgmVolume: (() => { const v = parseFloat(localStorage.getItem('bgmVolume')); return isNaN(v) ? 1.0 : v; })(),   // 0~1 (0도 유지)
+            sfxVolume: (() => { const v = parseFloat(localStorage.getItem('sfxVolume')); return isNaN(v) ? 1.0 : v; })(),    // 0~1 (0도 유지)
             bgmMuted: localStorage.getItem('bgmMuted') === 'true',
             abilityState: {},  // 캐릭터 능력 상태 (게임 시작 시 초기화)
         };
@@ -2646,6 +2647,16 @@
             }
 
             getHitbox() {
+                // 엎드리면(duck) 히트박스 위쪽이 낮아져서 낮게 나는 장애물을 피할 수 있어요
+                if (this.isDucking) {
+                    const duckCut = Math.floor(this.hitbox.height * 0.45);
+                    return {
+                        x: this.x + this.hitbox.offsetX,
+                        y: this.y + this.hitbox.offsetY + duckCut,
+                        width: this.hitbox.width,
+                        height: this.hitbox.height - duckCut
+                    };
+                }
                 return {
                     x: this.x + this.hitbox.offsetX,
                     y: this.y + this.hitbox.offsetY,
@@ -4069,7 +4080,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.14.2', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.15.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 ctx.restore();
             }
@@ -4114,6 +4125,7 @@
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
                         engine.scenes.gameOver = null;
+                        engine.scenes.ending = null;
                     }
                 }
                 // 캐릭터 선택 버튼 영역
@@ -4148,9 +4160,9 @@
                     if ('caches' in window) {
                         caches.keys().then(function(names) {
                             names.forEach(function(name) { caches.delete(name); });
-                        }).then(function() { window.location.reload(true); });
+                        }).then(function() { window.location.reload(); });
                     } else {
-                        window.location.reload(true);
+                        window.location.reload();
                     }
                 }
             }
@@ -4509,6 +4521,10 @@
                         ctx.fillStyle = '#22BB22';
                         ctx.font = '13px Arial';
                         ctx.fillText('보유중', cx, cardY + cellH - 16);
+                    } else if (key === '골든동그라미') {
+                        ctx.fillStyle = '#DAA520';
+                        ctx.font = 'bold 13px Arial';
+                        ctx.fillText('👑 엔딩 해금', cx, cardY + cellH - 16);
                     } else {
                         ctx.fillStyle = '#FF8800';
                         ctx.font = 'bold 14px Arial';
@@ -4623,6 +4639,10 @@
                             localStorage.setItem('selectedCharacter', key);
                             this.message = `${char.name} 선택 완료!`;
                             this.messageTimer = 1.5;
+                        } else if (key === '골든동그라미') {
+                            // 골든동그라미는 구매 불가 — LV.100 엔딩 전용 해금
+                            this.message = 'LV.100 엔딩을 보면 해금돼요! ✨';
+                            this.messageTimer = 2;
                         } else if (gameState.totalCoins >= char.cost) {
                             gameState.totalCoins -= char.cost;
                             gameState.unlockedCharacters.push(key);
@@ -4678,6 +4698,10 @@
                 this.flyingActive = false;
                 // 파도미 파도 이펙트 타이머
                 this.waveEffectTimer = 0;
+                // 파워업 효과 타이머 (자석/코인2배/슬로우)
+                this.magnetTimer = 0;
+                this.doubleCoinTimer = 0;
+                this.slowTimer = 0;
                 // 구간별 모드 배너 플래그
                 this.furyModeTriggered = false;
                 this.restModeTriggered = false;
@@ -4686,6 +4710,9 @@
 
             update(inputState, deltaTime) {
                 if (gameState.isPaused) return;
+
+                // 피격 번쩍 이펙트 타이머 (deltaTime 기반)
+                if (gameState.hitFlashTimer > 0) gameState.hitFlashTimer -= deltaTime;
 
                 this.background.update(deltaTime, gameState.score);
 
@@ -4821,7 +4848,10 @@
                     const fh = this.flyHackState;
 
                     // 활성화 배너 타이머
-                    if (fh.bannerTimer > 0) fh.bannerTimer -= deltaTime;
+                    if (fh.bannerTimer > 0) {
+                        fh.bannerTimer -= deltaTime;
+                        if (fh.bannerTimer <= 0) fh.justActivated = false; // 활성화 배너는 1회만
+                    }
 
                     if (fh.isFlying) {
                         // ★ 비행 중 ★
@@ -4962,10 +4992,10 @@
                         const spRange = Math.max(0.1, 0.25 - fury * 0.05);
                         this.obstacleTimer = spMin + Math.random() * spRange;
                         if (Math.random() < 0.5) {
-                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 150);
+                            setTimeout(() => { if (gameState.isRunning && !gameState.isPaused) this.spawnObstacle(); }, 150);
                         }
                         if (Math.random() < 0.2) {
-                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 280);
+                            setTimeout(() => { if (gameState.isRunning && !gameState.isPaused) this.spawnObstacle(); }, 280);
                         }
                     } else if (sc >= 1000) {
                         // ★★★ 1000~1499 휴식 구간: 일반 난이도 ★★★
@@ -4973,7 +5003,7 @@
                         const baseRange = Math.max(0.3, 0.8 - wc * 0.15);
                         this.obstacleTimer = baseMin + Math.random() * baseRange;
                         if (wc >= 2 && Math.random() < 0.15) {
-                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
+                            setTimeout(() => { if (gameState.isRunning && !gameState.isPaused) this.spawnObstacle(); }, 200);
                         }
                     } else if (sc >= 500) {
                         // ★★★ 500~999 극악 ★★★
@@ -4982,7 +5012,7 @@
                         const spRange = Math.max(0.2, 0.4 - fury * 0.07);
                         this.obstacleTimer = spMin + Math.random() * spRange;
                         if (Math.random() < 0.2) {
-                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 200);
+                            setTimeout(() => { if (gameState.isRunning && !gameState.isPaused) this.spawnObstacle(); }, 200);
                         }
                     } else {
                         // 일반 모드: 순환 기반 난이도
@@ -4991,7 +5021,7 @@
                         this.obstacleTimer = baseMin + Math.random() * baseRange;
                         // 동시 스폰
                         if (wc >= 1 && Math.random() < Math.min(0.5, wc * 0.15)) {
-                            setTimeout(() => { if (gameState.isRunning) this.spawnObstacle(); }, 150);
+                            setTimeout(() => { if (gameState.isRunning && !gameState.isPaused) this.spawnObstacle(); }, 150);
                         }
                     }
                 }
@@ -5022,22 +5052,41 @@
                     this.powerUpTimer = 6.0 + Math.random() * 4.0;
                 }
 
+                // ★ 파워업 효과 처리 (자석/코인2배/슬로우) ★
+                if (this.doubleCoinTimer > 0) this.doubleCoinTimer -= deltaTime;
+                if (this.slowTimer > 0) this.slowTimer -= deltaTime;
+                if (this.magnetTimer > 0) {
+                    this.magnetTimer -= deltaTime;
+                    const pcx = this.player.x + this.player.width / 2;
+                    const pcy = this.player.y + this.player.height / 2;
+                    this.coins.forEach(c => {
+                        const dx = pcx - c.x, dy = pcy - c.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < 260 && dist > 1) {
+                            c.x += (dx / dist) * 7;
+                            c.y += (dy / dist) * 7;
+                        }
+                    });
+                }
+                // 슬로우 파워업: 화면 이동 속도 40% 감소
+                const effSpeed = this.slowTimer > 0 ? gameState.gameSpeed * 0.6 : gameState.gameSpeed;
+
                 // Update obstacles (다크동에게 플레이어 Y 전달)
                 const playerY = this.player.y;
                 this.obstacles = this.obstacles.filter(o => {
-                    o.update(gameState.gameSpeed, deltaTime, playerY);
+                    o.update(effSpeed, deltaTime, playerY);
                     return o.x + o.width > 0;
                 });
 
                 // Update coins
                 this.coins = this.coins.filter(c => {
-                    c.update(gameState.gameSpeed, deltaTime);
+                    c.update(effSpeed, deltaTime);
                     return c.x + c.radius > 0;
                 });
 
                 // Update power-ups
                 this.powerUps = this.powerUps.filter(p => {
-                    p.update(gameState.gameSpeed, deltaTime);
+                    p.update(effSpeed, deltaTime);
                     return p.x + p.radius > 0;
                 });
 
@@ -5365,7 +5414,7 @@
                 // Check coin collisions
                 this.coins.forEach(coin => {
                     if (this.checkAABBCollision(playerHitbox, coin.getHitbox())) {
-                        addCoins(1);
+                        addCoins(this.doubleCoinTimer > 0 ? 2 : 1); // 코인 2배 파워업 적용
                         this.particles.createExplosion(coin.x, coin.y, '#FFD700', 6);
                         this.coins = this.coins.filter(c => c !== coin);
                         audioManager.playCoinSound();
@@ -5375,8 +5424,17 @@
                 // Check power-up collisions
                 this.powerUps.forEach(pu => {
                     if (this.checkAABBCollision(playerHitbox, pu.getHitbox())) {
-                        this.player.activePowerUp = pu.type;
-                        this.player.powerUpTimer = 5; // 5초 지속
+                        if (pu.type === 'shield') {
+                            this.player.activePowerUp = 'shield';
+                            // 네모미 시작 쉴드(999초)를 짧은 쉴드로 덮어쓰지 않도록 보호
+                            this.player.powerUpTimer = Math.max(this.player.powerUpTimer || 0, 5);
+                        } else if (pu.type === 'magnet') {
+                            this.magnetTimer = 6; // 6초간 코인 자석
+                        } else if (pu.type === '2x') {
+                            this.doubleCoinTimer = 6; // 6초간 코인 2배
+                        } else if (pu.type === 'slow') {
+                            this.slowTimer = 5; // 5초간 게임 속도 감소
+                        }
                         this.particles.createExplosion(pu.x, pu.y, pu.color, 10);
                         this.powerUps = this.powerUps.filter(p => p !== pu);
                         audioManager.playPowerUpSound();
@@ -5436,6 +5494,16 @@
                 ctx.font = 'bold 22px Arial';
                 ctx.fillStyle = gameState.speedLevel >= 80 ? '#FF2200' : gameState.speedLevel >= 50 ? '#FF8800' : '#0066CC';
                 ctx.fillText(`⚡ LV.${gameState.speedLevel}`, 230, 22);
+
+                // ★ 파워업 상태 표시 (자석/코인2배/슬로우) ★
+                if (this.magnetTimer > 0 || this.doubleCoinTimer > 0 || this.slowTimer > 0) {
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillStyle = '#8E44AD';
+                    let puX = 20;
+                    if (this.magnetTimer > 0) { ctx.fillText(`🧲 ${Math.ceil(this.magnetTimer)}초`, puX, 48); puX += 80; }
+                    if (this.doubleCoinTimer > 0) { ctx.fillText(`✨2배 ${Math.ceil(this.doubleCoinTimer)}초`, puX, 48); puX += 100; }
+                    if (this.slowTimer > 0) { ctx.fillText(`🐌 ${Math.ceil(this.slowTimer)}초`, puX, 48); }
+                }
 
                 // 겨울 통과 횟수 (5회 = 1레벨)
                 if (gameState.winterCount > 0) {
@@ -5747,7 +5815,7 @@
                     const flashAlpha = Math.min(0.45, gameState.hitFlashTimer * 1.2);
                     ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
                     ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
-                    gameState.hitFlashTimer -= 1/60; // 프레임당 감소
+                    // (감소는 update()에서 deltaTime 기반으로 처리)
                 }
 
                 // ★ 주주미 먹기 화면 플래시 이펙트 ★
@@ -5802,7 +5870,6 @@
 
                         if (fh.justActivated) {
                             ctx.fillText('🚀 FLY HACK ACTIVATED 🚀', GAME_CONFIG.width / 2, GAME_CONFIG.height * 0.35 + 38);
-                            if (fh.bannerTimer <= 0) fh.justActivated = false;
                         } else if (fh.isFlying) {
                             ctx.fillText('🕊️ 비행 모드 ON', GAME_CONFIG.width / 2, GAME_CONFIG.height * 0.35 + 38);
                         } else {
@@ -5929,6 +5996,7 @@
                     my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
                     this.activateFlight();
                     inputManager.resetJump();
+                    inputState.jumping = false; // 버튼 탭이 점프로 새지 않도록
                     return;
                 }
 
@@ -5940,6 +6008,7 @@
                     my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
                     this.activateWaveBlast();
                     inputManager.resetJump();
+                    inputState.jumping = false;
                     return;
                 }
 
@@ -5951,6 +6020,7 @@
                     my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
                     this.activateFartBoost();
                     inputManager.resetJump();
+                    inputState.jumping = false;
                     return;
                 }
 
@@ -5959,6 +6029,7 @@
                     my >= 20 && my <= 70) {
                     gameState.isPaused = !gameState.isPaused;
                     inputManager.resetJump();
+                    inputState.jumping = false; // 일시정지 탭이 점프로 새지 않도록
                     return;
                 }
 
@@ -5970,6 +6041,7 @@
                     if (mx >= cx - 100 && mx <= cx + 100 && my >= cy - 10 && my <= cy + 40) {
                         gameState.isPaused = false;
                         inputManager.resetJump();
+                        inputState.jumping = false;
                         return;
                     }
                     // 타이틀로 버튼
@@ -5979,6 +6051,7 @@
                         gameState.currentScene = 'title';
                         if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
                         inputManager.resetJump();
+                        inputState.jumping = false;
                         return;
                     }
                 }
@@ -6085,7 +6158,7 @@
                     // 최초: 이름 입력 필요
                     this.nameEntered = false;
                     this.showNamePrompt = false;
-                    this.namePromptTimer = 2.5;
+                    this.namePromptTimer = 1.5; // 버튼 활성화(2.0초)보다 먼저 떠서 기록 유실 방지
                 }
             }
 
@@ -6278,14 +6351,13 @@
                 ctx.font = 'bold 22px Arial';
                 ctx.fillText(`LV.${this.finalSpeedLevel}`, px + pw - 60, ly);
 
-                // ★ 랭킹 순위 표시 ★
+                // ★ 랭킹 순위 표시 (버튼 위 고정 위치 — 겹침 방지) ★
                 if (this.nameEntered && this.savedRank > 0) {
-                    ly += lineH + 5;
                     ctx.textAlign = 'center';
                     ctx.fillStyle = '#6C5CE7';
                     ctx.font = 'bold 18px Arial';
                     const rankEmoji = this.savedRank === 1 ? '🥇' : this.savedRank === 2 ? '🥈' : this.savedRank === 3 ? '🥉' : '🏆';
-                    ctx.fillText(`${rankEmoji} ${this.playerName} - 랭킹 ${this.savedRank}위!`, cx, ly);
+                    ctx.fillText(`${rankEmoji} ${this.playerName} - 랭킹 ${this.savedRank}위!`, cx, py + ph - 92);
                 }
 
                 // 버튼 영역 (3개: 다시하기, 랭킹, 메인메뉴)
@@ -6387,6 +6459,7 @@
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
                         engine.scenes.gameOver = null;
+                        engine.scenes.ending = null;
                     }
                 }
                 // 랭킹 버튼
@@ -6404,6 +6477,7 @@
                     if (typeof engine !== 'undefined' && engine.scenes) {
                         engine.scenes.game = null;
                         engine.scenes.gameOver = null;
+                        engine.scenes.ending = null;
                     }
                 }
                 // 버튼 밖 터치는 무시 (실수 방지)
@@ -6451,7 +6525,7 @@
                 this.returnTo = returnTo || 'title'; // 돌아갈 씬
                 this.records = Leaderboard.getAll();
                 this.scrollY = 0;
-                this.maxScroll = Math.max(0, this.records.length * 42 - 320);
+                this.maxScroll = Math.max(0, this.records.length * 42 + 5 - 350); // 목록 높이 350px 기준
                 this.bg = new Background();
                 this.animTime = 0;
             }
@@ -6636,9 +6710,35 @@
                     gameState.unlockedCharacters.push('골든동그라미');
                     localStorage.setItem('unlockedCharacters', JSON.stringify(gameState.unlockedCharacters));
                 }
-                // 최종 기록 저장
-                gameState.bestScore = Math.max(gameState.bestScore, Math.floor(gameState.score));
-                localStorage.setItem('bestScore', gameState.bestScore.toString());
+                // 최종 기록 저장 (게임오버와 동일하게 코인/통계도 정산)
+                const endScore = Math.floor(gameState.score);
+                const endCoins = gameState.coins;
+                gameState.bestScore = Math.max(gameState.bestScore, endScore);
+                gameState.bestCoins = Math.max(gameState.bestCoins, endCoins);
+                gameState.bestSpeedLevel = Math.max(gameState.bestSpeedLevel || 0, gameState.speedLevel);
+                gameState.totalCoins += endCoins;
+                gameState.totalGames = (gameState.totalGames || 0) + 1;
+                try {
+                    localStorage.setItem('bestScore', gameState.bestScore.toString());
+                    localStorage.setItem('bestCoins', gameState.bestCoins);
+                    localStorage.setItem('bestSpeedLevel', gameState.bestSpeedLevel);
+                    localStorage.setItem('totalCoins', gameState.totalCoins);
+                    localStorage.setItem('totalGames', gameState.totalGames);
+                } catch(e) { /* localStorage 사용 불가 환경 대응 */ }
+                // ★ 엔딩 클리어 기록도 랭킹보드에 저장 ★
+                try {
+                    const seasonLabels = { spring: '봄 🌸', summer: '여름 ☀️', autumn: '가을 🍂', winter: '겨울 ❄️' };
+                    const endName = localStorage.getItem('dongrami_player_name') || '이름없음';
+                    Leaderboard.add({
+                        name: endName,
+                        score: endScore,
+                        coins: endCoins,
+                        character: gameState.selectedCharacter,
+                        level: gameState.speedLevel,
+                        season: seasonLabels[getCurrentSeason(endScore)] || '겨울 ❄️',
+                        time: Math.floor((Date.now() - gameState.gameStartTime) / 1000)
+                    });
+                } catch(e) {}
             }
 
             update(deltaTime) {
@@ -6847,6 +6947,12 @@
                     if (mx >= cx - 90 && mx <= cx + 90 && my >= GAME_CONFIG.height - 80 && my <= GAME_CONFIG.height - 30) {
                         gameState.currentScene = 'title';
                         gameState.endingTriggered = false;
+                        gameState.isRunning = false;
+                        // 엔딩 씬 초기화 — 다음 LV.100 도달 시 컷신이 처음부터 재생되도록
+                        if (typeof engine !== 'undefined' && engine.scenes) {
+                            engine.scenes.ending = null;
+                            engine.scenes.game = null;
+                        }
                     }
                 }
             }
@@ -6876,12 +6982,8 @@
                 requestAnimationFrame((ts) => this.gameLoop(ts));
             }
 
-            gameLoop(timestamp) {
-                try {
-                    if (!this.lastTime) this.lastTime = timestamp;
-                    const deltaTime = Math.min((timestamp - this.lastTime), 33) / 1000;
-                    this.lastTime = timestamp;
-
+            // 한 번의 고정 스텝(1/60초) 업데이트
+            stepUpdate(deltaTime) {
                     // 씬 전환 감지 → 입력 클리어
                     if (gameState.currentScene !== this.prevScene) {
                         inputManager.lastTouchX = undefined;
@@ -6908,8 +7010,9 @@
                             this.scenes.game = new GameScene();
                         }
                         if (gameState.isRunning) {
-                            this.scenes.game.update(inputState, deltaTime);
+                            // handleInput을 먼저 실행 — 버튼 탭(일시정지 등)이 점프로 처리되는 것 방지
                             this.scenes.game.handleInput(inputState);
+                            this.scenes.game.update(inputState, deltaTime);
                         }
                     } else if (gameState.currentScene === 'gameOver') {
                         if (!this.scenes.gameOver) {
@@ -6930,6 +7033,22 @@
                         this.scenes.leaderboard.update(deltaTime);
                         this.scenes.leaderboard.handleInput(inputState);
                     }
+            }
+
+            gameLoop(timestamp) {
+                try {
+                    if (!this.lastTime) this.lastTime = timestamp;
+                    // ★ 고정 타임스텝: 120Hz/144Hz 화면에서도 60Hz와 동일한 게임 속도 보장 ★
+                    this.accumulator = (this.accumulator || 0) + Math.min(timestamp - this.lastTime, 100);
+                    this.lastTime = timestamp;
+                    const FIXED_STEP = 1000 / 60;
+                    let steps = 0;
+                    while (this.accumulator >= FIXED_STEP && steps < 3) {
+                        this.accumulator -= FIXED_STEP;
+                        steps++;
+                        this.stepUpdate(1 / 60);
+                    }
+                    if (steps === 3) this.accumulator = 0; // 지연 누적(스파이럴) 방지
 
                     // Draw
                     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -7035,15 +7154,20 @@
         document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 300));
         document.addEventListener('webkitfullscreenchange', () => setTimeout(resizeCanvas, 300));
 
-        // 첫 실행 시 보너스 코인 300개 지급
+        // 첫 실행 시 보너스 코인 300개 지급 (기존 세이브가 있으면 절대 초기화하지 않음)
         if (!localStorage.getItem('dongramiRunInitialized')) {
-            localStorage.setItem('totalCoins', '300');
-            localStorage.removeItem('selectedCharacter');
-            localStorage.removeItem('unlockedCharacters');
+            if (!localStorage.getItem('totalCoins')) {
+                // 진짜 신규 플레이어: 300코인으로 시작 + 지난 코인 이벤트는 종료 처리
+                localStorage.setItem('totalCoins', '300');
+                localStorage.removeItem('selectedCharacter');
+                localStorage.removeItem('unlockedCharacters');
+                ['coinEvent_20260322', 'coinEvent_20260322_v2', 'coinEvent_20260322_v3',
+                 'coinEvent_20260322_v4', 'coinEvent_20260322_v5'].forEach(k => localStorage.setItem(k, 'claimed'));
+                gameState.totalCoins = 300;
+                gameState.selectedCharacter = Object.keys(spriteConfig.sprites)[0];
+                gameState.unlockedCharacters = [Object.keys(spriteConfig.sprites)[0]];
+            }
             localStorage.setItem('dongramiRunInitialized', 'true');
-            gameState.totalCoins = 300;
-            gameState.selectedCharacter = Object.keys(spriteConfig.sprites)[0];
-            gameState.unlockedCharacters = [Object.keys(spriteConfig.sprites)[0]];
         }
 
         const audioManager = new AudioManager();
@@ -7065,8 +7189,10 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.14.2';
+        const GAME_VERSION = 'v3.15.0';
         if ('serviceWorker' in navigator) {
+            // 첫 설치 직후 불필요한 새로고침 방지용: 등록 전에 컨트롤러 존재 여부 기억
+            const hadController = !!navigator.serviceWorker.controller;
             navigator.serviceWorker.register('/dongrami-run/sw.js').then(reg => {
                 // PWA 실행 시 즉시 업데이트 체크
                 reg.update();
@@ -7079,17 +7205,23 @@
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed') {
                             if (navigator.serviceWorker.controller) {
-                                // 업데이트 배너 표시
-                                showUpdateBanner();
+                                // 업데이트 배너 표시 — 탭하면 대기 중인 새 SW를 활성화
+                                showUpdateBanner(() => {
+                                    if (reg.waiting) {
+                                        reg.waiting.postMessage('skipWaiting');
+                                    } else {
+                                        location.reload();
+                                    }
+                                });
                             }
                         }
                     });
                 });
 
-                // 컨트롤러 변경 시 자동 새로고침
+                // 컨트롤러 변경 시 자동 새로고침 (첫 설치 때는 제외)
                 let refreshing = false;
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    if (!refreshing) {
+                    if (!refreshing && hadController) {
                         refreshing = true;
                         location.reload();
                     }
@@ -7097,12 +7229,51 @@
             }).catch(err => console.log('SW 등록 실패:', err));
         }
 
-        function showUpdateBanner() {
+        // ★ version.json 폴링: SW와 독립적인 업데이트 감지 (iPad Safari PWA 대응) ★
+        (function() {
+            let versionBannerShown = false;
+            function checkVersionJson() {
+                if (versionBannerShown) return;
+                fetch('/dongrami-run/version.json?t=' + Date.now(), { cache: 'no-store' })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(info => {
+                        if (info && info.version && info.version !== GAME_VERSION) {
+                            versionBannerShown = true;
+                            showUpdateBanner(() => {
+                                const doReload = () => location.reload();
+                                if ('caches' in window) {
+                                    caches.keys()
+                                        .then(names => Promise.all(names.map(n => caches.delete(n))))
+                                        .then(doReload)
+                                        .catch(doReload);
+                                } else {
+                                    doReload();
+                                }
+                            });
+                        }
+                    })
+                    .catch(() => { /* 오프라인 등 - 무시 */ });
+            }
+            setTimeout(checkVersionJson, 5000);          // 시작 5초 후 1회
+            setInterval(checkVersionJson, 60000);        // 이후 60초마다
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') checkVersionJson();
+            });
+        })();
+
+        function showUpdateBanner(onClickAction) {
+            if (document.getElementById('dongrami-update-banner')) return; // 중복 방지
             const banner = document.createElement('div');
+            banner.id = 'dongrami-update-banner';
             banner.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;text-align:center;font-size:18px;font-weight:bold;z-index:99999;cursor:pointer;font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
             banner.innerHTML = '🎮 새 버전이 있어요! 터치하여 업데이트';
             banner.onclick = () => {
-                navigator.serviceWorker.controller.postMessage('skipWaiting');
+                banner.innerHTML = '⏳ 업데이트 중...';
+                if (onClickAction) {
+                    onClickAction();
+                } else {
+                    location.reload();
+                }
             };
             document.body.appendChild(banner);
         }
