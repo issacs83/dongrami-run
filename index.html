@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.17.1';
+        var CURRENT_VER = 'v3.18.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1979,6 +1979,80 @@
             '천사': { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
             '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
         };
+
+        // ============================================================================
+        // CHARACTER RARITY - 캐릭터 등급 (??? > 전설 > 좋음 > 영웅 > 희귀 > 일반)
+        // ============================================================================
+        const CHARACTER_RARITY = {
+            '골든동그라미': '???',
+            '무사': '???',
+            '동그라미하준': '전설',
+            '천사': '전설',
+            '악마': '좋음',
+            '김여름': '좋음',
+            '불미': '영웅',
+            '파도미': '영웅',
+            '농구미': '영웅',
+            '비행미': '희귀',
+            '주주미': '희귀',
+            '냠냠미': '희귀',
+            '가스미': '희귀',
+            '하트미': '희귀',
+            '삼각미': '일반',
+            '별미': '일반',
+            '네모미': '일반',
+            '동그라미': '일반'
+        };
+
+        // 등급별 색상 정의
+        // badge: 뱃지 배경색, text: 뱃지 글자색, card: 카드 배경 연한 색, border: 카드 테두리색
+        // rainbow: true면 뱃지를 무지개 그라데이션으로 그림 (??? 전용)
+        const RARITY_STYLE = {
+            '???':   { badge: '#B388FF', text: '#FFFFFF', card: '#F6ECFF', border: '#B388FF', rainbow: true },
+            '전설':  { badge: '#FFC107', text: '#6B4A00', card: '#FFF8E1', border: '#FFC107', rainbow: false },
+            '좋음':  { badge: '#FF9800', text: '#FFFFFF', card: '#FFF3E0', border: '#FF9800', rainbow: false },
+            '영웅':  { badge: '#AB47BC', text: '#FFFFFF', card: '#F5EAFA', border: '#AB47BC', rainbow: false },
+            '희귀':  { badge: '#29B6F6', text: '#FFFFFF', card: '#E8F6FE', border: '#29B6F6', rainbow: false },
+            '일반':  { badge: '#9E9E9E', text: '#FFFFFF', card: '#F5F5F5', border: '#BDBDBD', rainbow: false }
+        };
+
+        // 등급 뱃지를 캐릭터 스프라이트 아래에 그림
+        // cx: 카드 중심 X, cy: 뱃지 중심 Y, tier: 등급 문자열
+        function drawRarityBadge(ctx, cx, cy, tier) {
+            const style = RARITY_STYLE[tier];
+            if (!style) return;
+            ctx.save();
+            const padX = 12;
+            ctx.font = 'bold 12px Arial';
+            const textW = ctx.measureText(tier).width;
+            const bw = textW + padX * 2;
+            const bh = 19;
+            const bx = cx - bw / 2;
+            const by = cy - bh / 2;
+            // ??? 등급은 무지개 그라데이션 배경
+            if (style.rainbow) {
+                const grad = ctx.createLinearGradient(bx, by, bx + bw, by);
+                grad.addColorStop(0.00, '#FF5252');
+                grad.addColorStop(0.20, '#FFB300');
+                grad.addColorStop(0.40, '#66BB6A');
+                grad.addColorStop(0.60, '#29B6F6');
+                grad.addColorStop(0.80, '#7E57C2');
+                grad.addColorStop(1.00, '#EC407A');
+                ctx.fillStyle = grad;
+            } else {
+                ctx.fillStyle = style.badge;
+            }
+            ctx.beginPath();
+            ctx.roundRect(bx, by, bw, bh, 9);
+            ctx.fill();
+            // 뱃지 글자
+            ctx.fillStyle = style.text;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText(tier, cx, cy + 1);
+            ctx.restore();
+        }
 
         // 코인 추가 헬퍼 함수 (캐릭터 코인 배수 적용)
         function addCoins(amount) {
@@ -4163,7 +4237,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.17.1', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.18.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 // ★ 숨겨진 큰코인 (매번 랜덤 위치 — 꽁꽁 숨어 있음!) ★
                 if (this.bigCoinVisible) {
@@ -4618,10 +4692,15 @@
                     const isSelected = gameState.selectedCharacter === key;
                     const isUnlocked = gameState.unlockedCharacters.includes(key);
 
-                    // 카드 배경 (좀 더 큰 카드)
-                    ctx.fillStyle = isSelected ? '#DDEEFF' : '#F5F5F5';
-                    ctx.strokeStyle = isSelected ? '#0099FF' : '#DDD';
-                    ctx.lineWidth = isSelected ? 3 : 1;
+                    // 캐릭터 등급 조회 (등급 정보가 없으면 일반 처리)
+                    const tier = CHARACTER_RARITY[key] || '일반';
+                    const tierStyle = RARITY_STYLE[tier] || RARITY_STYLE['일반'];
+
+                    // 카드 배경 (등급 색을 연하게 깔고, 선택된 카드는 주황 테두리로 구분)
+                    // 희귀 등급의 파란색과 겹치지 않도록 선택 표시는 테마색 주황을 사용
+                    ctx.fillStyle = isSelected ? '#FFE8CC' : tierStyle.card;
+                    ctx.strokeStyle = isSelected ? '#FF6600' : tierStyle.border;
+                    ctx.lineWidth = isSelected ? 4 : 2;
                     ctx.beginPath();
                     ctx.roundRect(cx - cellW/2 + 8, cardY, cellW - 16, cellH - 10, 12);
                     ctx.fill();
@@ -4629,9 +4708,9 @@
 
                     // 선택 하이라이트 글로우
                     if (isSelected) {
-                        ctx.shadowColor = '#0099FF';
+                        ctx.shadowColor = '#FF6600';
                         ctx.shadowBlur = 8;
-                        ctx.strokeStyle = '#0099FF';
+                        ctx.strokeStyle = '#FF6600';
                         ctx.lineWidth = 2;
                         ctx.beginPath();
                         ctx.roundRect(cx - cellW/2 + 8, cardY, cellW - 16, cellH - 10, 12);
@@ -4663,9 +4742,14 @@
                         ctx.fillText('🔒', cx, cardY + 50);
                     }
 
+                    // 등급 뱃지 (캐릭터 스프라이트 바로 아래)
+                    drawRarityBadge(ctx, cx, cardY + 98, tier);
+
                     // 캐릭터 이름
                     ctx.fillStyle = '#333';
                     ctx.font = 'bold 15px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
                     ctx.fillText(char.name, cx, cardY + cellH - 48);
 
                     // 능력 이름 (작은 글씨)
@@ -4678,7 +4762,7 @@
 
                     // 가격 또는 상태
                     if (isSelected && isUnlocked) {
-                        ctx.fillStyle = '#0099FF';
+                        ctx.fillStyle = '#FF6600';
                         ctx.font = 'bold 14px Arial';
                         ctx.fillText('✓ 선택됨', cx, cardY + cellH - 16);
                     } else if (isUnlocked) {
@@ -7458,7 +7542,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.17.1';
+        const GAME_VERSION = 'v3.18.0';
         if ('serviceWorker' in navigator) {
             // 첫 설치 직후 불필요한 새로고침 방지용: 등록 전에 컨트롤러 존재 여부 기억
             const hadController = !!navigator.serviceWorker.controller;
