@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.18.0';
+        var CURRENT_VER = 'v3.19.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1855,10 +1855,86 @@
                 cost: 2000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 물음표미 (능력이 매판 바뀌는 수수께끼 캐릭터 - 색이 계속 변하는 물음표 몸체)
+            const mulEumpyomi = {
+                name: '물음표미', colors: { main: '#9C27B0', secondary: '#6A1B9A' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    // 프레임에 따라 색상환을 돌며 몸 색이 계속 변함 (능력이 바뀐다는 느낌)
+                    const hue = (frameIndex * 2) % 360;
+                    const bodyColor = `hsl(${hue}, 75%, 58%)`;
+                    const darkColor = `hsl(${hue}, 70%, 38%)`;
+                    const lightColor = `hsl(${hue}, 85%, 75%)`;
+                    const bob = Math.sin(frameIndex * 0.12) * 2;
+                    const pulse = 1 + Math.sin(frameIndex * 0.1) * 0.04;
+                    ctx.scale(pulse, pulse);
+                    ctx.translate(0, bob);
+                    // 수수께끼 오라
+                    ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.15)`;
+                    ctx.beginPath(); ctx.arc(0, 0, 35, 0, Math.PI * 2); ctx.fill();
+                    // 둥근 몸체
+                    const bodyGrad = ctx.createRadialGradient(-6, -8, 4, 0, 0, 26);
+                    bodyGrad.addColorStop(0, lightColor);
+                    bodyGrad.addColorStop(0.6, bodyColor);
+                    bodyGrad.addColorStop(1, darkColor);
+                    ctx.fillStyle = bodyGrad;
+                    ctx.beginPath(); ctx.arc(0, 2, 26, 0, Math.PI * 2); ctx.fill();
+                    // 물음표 갈고리 (머리 위에 떠 있는 상징)
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 5;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.arc(0, -30, 7, Math.PI * 0.95, Math.PI * 2.25);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(4, -25);
+                    ctx.lineTo(1, -20);
+                    ctx.stroke();
+                    // 물음표 아래 점
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath(); ctx.arc(1, -15, 2.6, 0, Math.PI * 2); ctx.fill();
+                    // 눈
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-9, 0, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9, 0, 7, 0, Math.PI * 2); ctx.fill();
+                    // 눈동자 (좌우로 두리번거림)
+                    const look = Math.sin(frameIndex * 0.07) * 2.5;
+                    ctx.fillStyle = darkColor;
+                    ctx.beginPath(); ctx.arc(-9 + look, 1, 3.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(9 + look, 1, 3.5, 0, Math.PI * 2); ctx.fill();
+                    // 눈 하이라이트
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-10 + look, -1, 1.4, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8 + look, -1, 1.4, 0, Math.PI * 2); ctx.fill();
+                    // 입 (아리송한 표정)
+                    ctx.strokeStyle = darkColor; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(-5, 12);
+                    ctx.quadraticCurveTo(0, 17, 5, 12);
+                    ctx.stroke();
+                    // 점프 시 물음표 파티클이 튀어나옴
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.65;
+                        ctx.font = 'bold 13px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        for (let i = 0; i < 5; i++) {
+                            const a = frameIndex * 0.15 + i * 1.26;
+                            const r = 30 + Math.sin(a * 2) * 6;
+                            ctx.fillStyle = `hsl(${(hue + i * 60) % 360}, 80%, 60%)`;
+                            ctx.fillText('?', Math.cos(a) * r, Math.sin(a) * r + 4);
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 5000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '주주미', '농구미', '비행미', '파도미', '불미', '무사', '악마', '천사', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '주주미', '농구미', '비행미', '파도미', '불미', '무사', '악마', '천사', '물음표미', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '주주미': jujumi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '불미': bulmi, '무사': musa, '악마': akma, '천사': angel, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '주주미': jujumi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '불미': bulmi, '무사': musa, '악마': akma, '천사': angel, '물음표미': mulEumpyomi, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -1977,8 +2053,41 @@
             '무사': { name: '무적의 검', desc: '악당/벌/눈사람 면역 + 코인10배 (버섯/선인장/바위는 데미지)', type: 'warrior', coinMulti: 10 },
             '악마': { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
             '천사': { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
-            '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
+            '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 },
+            '물음표미': { name: '수수께끼', desc: '플레이할 때마다 능력이 바뀜!', type: 'random' }
         };
+
+        // 물음표미가 게임 시작 시 뽑는 능력 후보들
+        // 게임을 시작할 때마다 이 중 하나가 무작위로 결정됨
+        const QUESTION_ABILITY_POOL = [
+            { name: '철벽 방어', desc: '쉴드로 시작', type: 'startShield' },
+            { name: '스타 점프', desc: '더블점프 시 코인+1', type: 'doubleJumpCoin' },
+            { name: '단단한 몸', desc: '3회 피격 무시', type: 'hitIgnore', charges: 3 },
+            { name: '봄의 축복', desc: '봄에 1초마다 코인+1', type: 'springCoin' },
+            { name: '여름의 열기', desc: '여름 코인자동+코인3배', type: 'summerCoin', coinMulti: 3 },
+            { name: '호빵 파워', desc: '가을겨울 코인자동+코인5배', type: 'autumnWinterCoin', coinMulti: 5 },
+            { name: '방귀 부스터', desc: '독가스+코인2배 (100회)', type: 'fartBoost', charges: 100, coinMulti: 2 },
+            { name: '먹보', desc: '장애물 냠냠 (60회) + 코인2배', type: 'eatObstacle', charges: 60, coinMulti: 2 },
+            { name: '슬램덩크', desc: '코인3배 + 점프력 UP', type: 'basketball', coinMulti: 3, jumpBoost: -20 },
+            { name: '비행 모드', desc: '10초 비행+코인2배 (50회)', type: 'flight', charges: 50, flightDuration: 10, coinMulti: 2 },
+            { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
+            { name: '화염 방사', desc: '불을 쏴서 장애물 전체 소각 + 5코인 (70회)', type: 'fireBlast', charges: 70 },
+            { name: '무적의 검', desc: '악당/벌/눈사람 면역 + 코인10배', type: 'warrior', coinMulti: 10 },
+            { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
+            { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
+            { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 }
+        ];
+
+        // 물음표미의 원래 능력 설명 (카드 화면에서는 뽑힌 능력 대신 이 설명을 보여줌)
+        const QUESTION_BASE_ABILITY = { name: '수수께끼', desc: '플레이할 때마다 능력이 바뀜!', type: 'random' };
+
+        // 물음표미 능력을 무작위로 다시 뽑음
+        // 능력표 자체를 교체해서 기존 능력 처리 코드가 그대로 동작하게 함
+        function rollQuestionAbility() {
+            const picked = QUESTION_ABILITY_POOL[Math.floor(Math.random() * QUESTION_ABILITY_POOL.length)];
+            CHARACTER_ABILITIES['물음표미'] = Object.assign({}, picked);
+            return CHARACTER_ABILITIES['물음표미'];
+        }
 
         // ============================================================================
         // CHARACTER RARITY - 캐릭터 등급 (??? > 전설 > 좋음 > 영웅 > 희귀 > 일반)
@@ -1986,6 +2095,7 @@
         const CHARACTER_RARITY = {
             '골든동그라미': '???',
             '무사': '???',
+            '물음표미': '???',
             '동그라미하준': '전설',
             '천사': '전설',
             '악마': '좋음',
@@ -4237,7 +4347,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.18.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.19.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 // ★ 숨겨진 큰코인 (매번 랜덤 위치 — 꽁꽁 숨어 있음!) ★
                 if (this.bigCoinVisible) {
@@ -4348,6 +4458,15 @@
                     gameState.gameStartTime = Date.now();
                     // 캐릭터 능력 상태 초기화
                     gameState.abilityState = {};
+                    // 물음표미는 게임 시작마다 능력을 새로 뽑음
+                    if (gameState.selectedCharacter === '물음표미') {
+                        const rolled = rollQuestionAbility();
+                        gameState.rolledAbilityName = rolled.name;
+                        gameState.rolledAbilityDesc = rolled.desc;
+                        gameState.rolledAbilityTimer = 4.0;
+                    } else {
+                        gameState.rolledAbilityTimer = 0;
+                    }
                     const ability = CHARACTER_ABILITIES[gameState.selectedCharacter];
                     if (ability) {
                         if (ability.type === 'hitIgnore') gameState.abilityState.hitIgnoreLeft = ability.charges;
@@ -4753,7 +4872,8 @@
                     ctx.fillText(char.name, cx, cardY + cellH - 48);
 
                     // 능력 이름 (작은 글씨)
-                    const ab = CHARACTER_ABILITIES[key];
+                    // 물음표미는 뽑힌 능력이 아니라 원래 설명을 보여줌
+                    const ab = (key === '물음표미') ? QUESTION_BASE_ABILITY : CHARACTER_ABILITIES[key];
                     if (ab && ab.type !== 'none') {
                         ctx.fillStyle = '#888';
                         ctx.font = '11px Arial';
@@ -4798,7 +4918,7 @@
 
                 // ── 하단 고정 영역 ──
                 // 선택된 캐릭터 능력 표시
-                const selectedAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                const selectedAbility = (gameState.selectedCharacter === '물음표미') ? QUESTION_BASE_ABILITY : CHARACTER_ABILITIES[gameState.selectedCharacter];
                 if (selectedAbility && selectedAbility.type !== 'none') {
                     ctx.fillStyle = 'rgba(255,102,0,0.1)';
                     ctx.beginPath();
@@ -4963,6 +5083,8 @@
 
                 // 피격 번쩍 이펙트 타이머 (deltaTime 기반)
                 if (gameState.hitFlashTimer > 0) gameState.hitFlashTimer -= deltaTime;
+                // 물음표미 능력 안내 배너 타이머 감소
+                if (gameState.rolledAbilityTimer > 0) gameState.rolledAbilityTimer -= deltaTime;
 
                 this.background.update(deltaTime, gameState.score);
 
@@ -5746,6 +5868,25 @@
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
                 ctx.fillText(`점수: ${Math.floor(gameState.score)}`, 20, 20);
+
+                // 물음표미 능력 추첨 결과 배너 (게임 시작 후 4초간)
+                if (gameState.rolledAbilityTimer > 0) {
+                    ctx.save();
+                    const fade = Math.min(1, gameState.rolledAbilityTimer);
+                    ctx.globalAlpha = fade;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const bw = 440;
+                    const bx = GAME_CONFIG.width / 2 - bw / 2;
+                    ctx.fillStyle = 'rgba(156,39,176,0.9)';
+                    ctx.beginPath(); ctx.roundRect(bx, 70, bw, 56, 14); ctx.fill();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 20px Arial';
+                    ctx.fillText(`❓ 오늘의 능력: ${gameState.rolledAbilityName}`, GAME_CONFIG.width / 2, 90);
+                    ctx.font = '15px Arial';
+                    ctx.fillText(gameState.rolledAbilityDesc, GAME_CONFIG.width / 2, 113);
+                    ctx.restore();
+                }
 
                 // 속도 레벨 표시 (점수 옆)
                 ctx.font = 'bold 22px Arial';
@@ -6792,6 +6933,15 @@
                     gameState.gameStartTime = Date.now();
                     // 캐릭터 능력 상태 초기화
                     gameState.abilityState = {};
+                    // 물음표미는 다시하기 때도 능력을 새로 뽑음
+                    if (gameState.selectedCharacter === '물음표미') {
+                        const rolled2 = rollQuestionAbility();
+                        gameState.rolledAbilityName = rolled2.name;
+                        gameState.rolledAbilityDesc = rolled2.desc;
+                        gameState.rolledAbilityTimer = 4.0;
+                    } else {
+                        gameState.rolledAbilityTimer = 0;
+                    }
                     const ability2 = CHARACTER_ABILITIES[gameState.selectedCharacter];
                     if (ability2) {
                         if (ability2.type === 'hitIgnore') gameState.abilityState.hitIgnoreLeft = ability2.charges;
@@ -7542,7 +7692,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.18.0';
+        const GAME_VERSION = 'v3.19.0';
         if ('serviceWorker' in navigator) {
             // 첫 설치 직후 불필요한 새로고침 방지용: 등록 전에 컨트롤러 존재 여부 기억
             const hadController = !!navigator.serviceWorker.controller;
