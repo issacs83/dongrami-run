@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.19.0';
+        var CURRENT_VER = 'v3.20.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -1931,10 +1931,86 @@
                 cost: 5000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 뒤로가기미 (3초 전으로 시간을 되돌리는 캐릭터 - 시계와 되감기 화살표 모티프)
+            const dwirogagimi = {
+                name: '뒤로가기미', colors: { main: '#00ACC1', secondary: '#00707C' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const pulse = 1 + Math.sin(frameIndex * 0.1) * 0.035;
+                    ctx.scale(pulse, pulse);
+                    // 시간 오라 (반시계 방향으로 도는 잔상)
+                    ctx.globalAlpha = 0.18;
+                    for (let i = 0; i < 3; i++) {
+                        const a = -frameIndex * 0.06 - i * 0.55;
+                        ctx.fillStyle = '#00ACC1';
+                        ctx.beginPath();
+                        ctx.arc(Math.cos(a) * 30, Math.sin(a) * 12, 12 - i * 2.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                    // 몸체
+                    const bodyGrad = ctx.createRadialGradient(-6, -8, 4, 0, 0, 26);
+                    bodyGrad.addColorStop(0, '#B2EBF2');
+                    bodyGrad.addColorStop(0.55, '#00ACC1');
+                    bodyGrad.addColorStop(1, '#00707C');
+                    ctx.fillStyle = bodyGrad;
+                    ctx.beginPath(); ctx.arc(0, 2, 26, 0, Math.PI * 2); ctx.fill();
+                    // 되감기 화살표 고리 (반시계 방향으로 회전)
+                    ctx.save();
+                    ctx.rotate(-frameIndex * 0.04);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+                    ctx.lineWidth = 3.5;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.arc(0, 2, 20, 0.5, Math.PI * 1.75);
+                    ctx.stroke();
+                    // 화살촉
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                    ctx.beginPath();
+                    ctx.moveTo(-1, -19);
+                    ctx.lineTo(7, -15);
+                    ctx.lineTo(-1, -11);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                    // 눈
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-8, 0, 6.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, 0, 6.5, 0, Math.PI * 2); ctx.fill();
+                    // 눈동자 (시계 반대 방향으로 도는 느낌)
+                    const spin = -frameIndex * 0.08;
+                    const ex = Math.cos(spin) * 2.2;
+                    const ey = Math.sin(spin) * 2.2;
+                    ctx.fillStyle = '#00707C';
+                    ctx.beginPath(); ctx.arc(-8 + ex, 1 + ey, 3.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8 + ex, 1 + ey, 3.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.arc(-9.5, -1.5, 1.3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(6.5, -1.5, 1.3, 0, Math.PI * 2); ctx.fill();
+                    // 입 (차분한 미소)
+                    ctx.strokeStyle = '#00707C'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(-5, 12);
+                    ctx.quadraticCurveTo(0, 17, 5, 12);
+                    ctx.stroke();
+                    // 점프 시 시간 잔상이 뒤로 흩어짐
+                    if (isJumping) {
+                        ctx.globalAlpha = 0.45;
+                        for (let i = 1; i <= 3; i++) {
+                            ctx.fillStyle = '#4DD0E1';
+                            ctx.beginPath(); ctx.arc(i * 13, 4, 20 - i * 4, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.restore();
+                },
+                cost: 2500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '주주미', '농구미', '비행미', '파도미', '불미', '무사', '악마', '천사', '물음표미', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '주주미', '농구미', '비행미', '파도미', '불미', '무사', '악마', '천사', '뒤로가기미', '물음표미', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '주주미': jujumi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '불미': bulmi, '무사': musa, '악마': akma, '천사': angel, '물음표미': mulEumpyomi, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '주주미': jujumi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '불미': bulmi, '무사': musa, '악마': akma, '천사': angel, '뒤로가기미': dwirogagimi, '물음표미': mulEumpyomi, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -2054,6 +2130,7 @@
             '악마': { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
             '천사': { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
             '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 },
+            '뒤로가기미': { name: '시간 되감기', desc: '3초 전으로 되돌리기 (50회)', type: 'rewind', charges: 50 },
             '물음표미': { name: '수수께끼', desc: '플레이할 때마다 능력이 바뀜!', type: 'random' }
         };
 
@@ -2071,6 +2148,7 @@
             { name: '슬램덩크', desc: '코인3배 + 점프력 UP', type: 'basketball', coinMulti: 3, jumpBoost: -20 },
             { name: '비행 모드', desc: '10초 비행+코인2배 (50회)', type: 'flight', charges: 50, flightDuration: 10, coinMulti: 2 },
             { name: '쓰나미', desc: '화면 전체 장애물 제거 (80회)', type: 'waveBlast', charges: 80 },
+            { name: '시간 되감기', desc: '3초 전으로 되돌리기 (50회)', type: 'rewind', charges: 50 },
             { name: '화염 방사', desc: '불을 쏴서 장애물 전체 소각 + 5코인 (70회)', type: 'fireBlast', charges: 70 },
             { name: '무적의 검', desc: '악당/벌/눈사람 면역 + 코인10배', type: 'warrior', coinMulti: 10 },
             { name: '악마의 계약', desc: '악당에게 데미지 면역', type: 'villainImmune' },
@@ -2096,6 +2174,7 @@
             '골든동그라미': '???',
             '무사': '???',
             '물음표미': '???',
+            '뒤로가기미': '전설',
             '동그라미하준': '전설',
             '천사': '전설',
             '악마': '좋음',
@@ -2651,6 +2730,9 @@
                     if (e.key === 'f' || e.key === 'F') {
                         this.fartPressed = true;
                     }
+                    if (e.key === 'r' || e.key === 'R') {
+                        this.rewindPressed = true;
+                    }
                 });
 
                 document.addEventListener('keyup', (e) => {
@@ -2723,9 +2805,11 @@
                 const state = {
                     jumping: this.jumping,
                     ducking: this.ducking,
-                    fart: this.fartPressed
+                    fart: this.fartPressed,
+                    rewind: this.rewindPressed
                 };
                 this.fartPressed = false;
+                this.rewindPressed = false;
                 return state;
             }
 
@@ -4347,7 +4431,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.19.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.20.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 // ★ 숨겨진 큰코인 (매번 랜덤 위치 — 꽁꽁 숨어 있음!) ★
                 if (this.bigCoinVisible) {
@@ -4475,6 +4559,7 @@
                         if (ability.type === 'autumnWinterCoin') gameState.abilityState.seasonCoinTimer = 0;
                         if (ability.type === 'fartBoost') gameState.abilityState.fartCharges = ability.charges;
                         if (ability.type === 'waveBlast') gameState.abilityState.waveCharges = ability.charges;
+                        if (ability.type === 'rewind') gameState.abilityState.rewindCharges = ability.charges;
                         if (ability.type === 'fireBlast') gameState.abilityState.fireBlastCharges = ability.charges;
                         if (ability.type === 'flight') { gameState.abilityState.flightCharges = ability.charges; gameState.abilityState.flyingTimer = 0; }
                         if (ability.type === 'eatObstacle') { gameState.abilityState.eatCharges = ability.charges; gameState.abilityState.eatEffectTimer = 0; }
@@ -5041,6 +5126,10 @@
                 this.obstacleTimer = 3.0; // 첫 장애물까지 3초 대기
                 this.coinTimer = 1.5;
                 this.powerUpTimer = 8.0;
+                // 뒤로가기미 시간 기록 버퍼 (0.1초 간격으로 최근 4초치 보관)
+                this.rewindHistory = [];
+                this.rewindSampleTimer = 0;
+                this.rewindEffectTimer = 0;
                 this.seasonBanner = null; // { text, timer }
                 this.lastSeason = 'spring';
                 this.prevSeasonForWinter = 'spring'; // 겨울→봄 전환 감지용
@@ -5085,6 +5174,16 @@
                 if (gameState.hitFlashTimer > 0) gameState.hitFlashTimer -= deltaTime;
                 // 물음표미 능력 안내 배너 타이머 감소
                 if (gameState.rolledAbilityTimer > 0) gameState.rolledAbilityTimer -= deltaTime;
+                // 뒤로가기미 되감기 이펙트 타이머
+                if (this.rewindEffectTimer > 0) this.rewindEffectTimer -= deltaTime;
+                // 뒤로가기미 능력을 가진 경우에만 게임 상태를 주기적으로 기록
+                if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'rewind') {
+                    this.rewindSampleTimer += deltaTime;
+                    if (this.rewindSampleTimer >= 0.1) {
+                        this.rewindSampleTimer = 0;
+                        this.recordRewindSnapshot();
+                    }
+                }
 
                 this.background.update(deltaTime, gameState.score);
 
@@ -5163,6 +5262,11 @@
                 this.particles.update(deltaTime);
 
                 // 가스미 방귀 부스터: 키보드 F키 활성화 (쿨다운: 이펙트 재생 중 재발동 방지)
+                // 뒤로가기미: R키로 되감기 발동
+                if (inputState.rewind && CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'rewind' &&
+                    (gameState.abilityState?.rewindCharges || 0) > 0 && (this.rewindEffectTimer || 0) <= 0) {
+                    this.activateRewind();
+                }
                 if (inputState.fart && CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'fartBoost' &&
                     (gameState.abilityState?.fartCharges || 0) > 0 && this.fartEffectTimer <= 0) {
                     this.activateFartBoost();
@@ -5869,6 +5973,21 @@
                 ctx.textBaseline = 'top';
                 ctx.fillText(`점수: ${Math.floor(gameState.score)}`, 20, 20);
 
+                // 뒤로가기미 되감기 화면 효과 (청록색 플래시 + 안내 문구)
+                if ((this.rewindEffectTimer || 0) > 0) {
+                    ctx.save();
+                    const rt = this.rewindEffectTimer / 0.7;
+                    ctx.fillStyle = `rgba(0,172,193,${0.35 * rt})`;
+                    ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+                    ctx.globalAlpha = rt;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 42px Arial';
+                    ctx.fillText('⏪ 3초 전으로!', GAME_CONFIG.width / 2, GAME_CONFIG.height / 2);
+                    ctx.restore();
+                }
+
                 // 물음표미 능력 추첨 결과 배너 (게임 시작 후 4초간)
                 if (gameState.rolledAbilityTimer > 0) {
                     ctx.save();
@@ -6106,6 +6225,30 @@
                         ctx.fillText('(F키)', btnX + 55, btnY + 45);
                     }
                 }
+                // 뒤로가기미 되감기 HUD
+                if (abilityType === 'rewind') {
+                    const rcharges = gameState.abilityState?.rewindCharges || 0;
+                    ctx.fillStyle = rcharges > 0 ? '#00ACC1' : '#666';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`⏪ 되감기 ${rcharges}회`, 15, 135);
+                    if (rcharges > 0) {
+                        const btnX = GAME_CONFIG.width - 120;
+                        const btnY = GAME_CONFIG.height - 65;
+                        ctx.fillStyle = 'rgba(0,172,193,0.85)';
+                        ctx.beginPath(); ctx.roundRect(btnX, btnY, 110, 50, 12); ctx.fill();
+                        ctx.strokeStyle = '#00707C'; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.roundRect(btnX, btnY, 110, 50, 12); ctx.stroke();
+                        ctx.fillStyle = '#FFF';
+                        ctx.font = 'bold 18px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('⏪ 되감기', btnX + 55, btnY + 22);
+                        ctx.font = '11px Arial';
+                        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                        ctx.fillText('(R키)', btnX + 55, btnY + 40);
+                    }
+                }
+
                 // 파도미 파도 HUD
                 if (abilityType === 'waveBlast') {
                     const wcharges = gameState.abilityState?.waveCharges || 0;
@@ -6399,6 +6542,84 @@
                 audioManager.playPowerUpSound();
             }
 
+            recordRewindSnapshot() {
+                // 현재 게임 상태를 한 장 찍어서 기록 버퍼에 넣음
+                // 장애물/코인은 객체 참조와 위치를 함께 저장해 되돌릴 때 그대로 복원함
+                const snap = {
+                    playerX: this.player.x,
+                    playerY: this.player.y,
+                    playerVelocityY: this.player.velocityY,
+                    playerIsJumping: this.player.isJumping,
+                    playerIsDucking: this.player.isDucking,
+                    playerDoubleJump: this.player.doubleJumpAvailable,
+                    playerPowerUp: this.player.activePowerUp,
+                    playerPowerUpTimer: this.player.powerUpTimer,
+                    obstacles: this.obstacles.map(o => ({ ref: o, x: o.x, y: o.y })),
+                    coins: this.coins.map(c => ({ ref: c, x: c.x, y: c.y })),
+                    powerUps: this.powerUps.map(pu => ({ ref: pu, x: pu.x, y: pu.y })),
+                    obstacleTimer: this.obstacleTimer,
+                    coinTimer: this.coinTimer,
+                    powerUpTimer: this.powerUpTimer,
+                    score: gameState.score,
+                    coins_: gameState.coins,
+                    coinsEarned: gameState.coinsEarned,
+                    lives: gameState.lives,
+                    gameSpeed: gameState.gameSpeed,
+                    speedLevel: gameState.speedLevel,
+                    seasonLevel: gameState.seasonLevel,
+                    winterCount: gameState.winterCount,
+                    invulnTimer: gameState.invulnTimer
+                };
+                this.rewindHistory.push(snap);
+                // 최근 4초치(40장)만 유지
+                if (this.rewindHistory.length > 40) this.rewindHistory.shift();
+            }
+
+            activateRewind() {
+                // 충전량이 없거나 되돌릴 기록이 부족하면 발동하지 않음
+                if ((gameState.abilityState?.rewindCharges || 0) <= 0) return;
+                if (this.rewindHistory.length < 2) return;
+                gameState.abilityState.rewindCharges--;
+                // 3초 전 = 0.1초 간격 기록에서 30장 전
+                // 기록이 3초치보다 적으면 가장 오래된 기록으로 되돌림
+                const backIndex = Math.max(0, this.rewindHistory.length - 31);
+                const snap = this.rewindHistory[backIndex];
+                // 플레이어 복원
+                this.player.x = snap.playerX;
+                this.player.y = snap.playerY;
+                this.player.velocityY = snap.playerVelocityY;
+                this.player.isJumping = snap.playerIsJumping;
+                this.player.isDucking = snap.playerIsDucking;
+                this.player.doubleJumpAvailable = snap.playerDoubleJump;
+                this.player.activePowerUp = snap.playerPowerUp;
+                this.player.powerUpTimer = snap.playerPowerUpTimer;
+                // 장애물/코인/파워업 복원 (그 시점에 있던 것들을 위치까지 되돌림)
+                this.obstacles = snap.obstacles.map(o => { o.ref.x = o.x; o.ref.y = o.y; return o.ref; });
+                this.coins = snap.coins.map(c => { c.ref.x = c.x; c.ref.y = c.y; return c.ref; });
+                this.powerUps = snap.powerUps.map(pu => { pu.ref.x = pu.x; pu.ref.y = pu.y; return pu.ref; });
+                // 생성 타이머 복원
+                this.obstacleTimer = snap.obstacleTimer;
+                this.coinTimer = snap.coinTimer;
+                this.powerUpTimer = snap.powerUpTimer;
+                // 점수/코인/목숨 복원
+                gameState.score = snap.score;
+                gameState.coins = snap.coins_;
+                gameState.coinsEarned = snap.coinsEarned;
+                gameState.lives = snap.lives;
+                gameState.gameSpeed = snap.gameSpeed;
+                gameState.speedLevel = snap.speedLevel;
+                gameState.seasonLevel = snap.seasonLevel;
+                gameState.winterCount = snap.winterCount;
+                // 되돌린 직후 바로 부딪히지 않도록 잠깐 무적
+                gameState.invulnTimer = Math.max(snap.invulnTimer, 1.2);
+                gameState.hitFlashTimer = 0;
+                // 되돌아간 지점부터 다시 기록 시작
+                this.rewindHistory = this.rewindHistory.slice(0, backIndex + 1);
+                this.rewindSampleTimer = 0;
+                this.rewindEffectTimer = 0.7;
+                audioManager.playPowerUpSound();
+            }
+
             activateWaveBlast() {
                 if ((gameState.abilityState?.waveCharges || 0) <= 0) return;
                 gameState.abilityState.waveCharges--;
@@ -6474,6 +6695,18 @@
                     this.activateFlight();
                     inputManager.resetJump();
                     inputState.jumping = false; // 버튼 탭이 점프로 새지 않도록
+                    return;
+                }
+
+                // 뒤로가기미 되감기 버튼: 우측 하단
+                const abilityTypeRewind = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
+                if (abilityTypeRewind === 'rewind' && inputState.jumping && !gameState.isPaused &&
+                    (gameState.abilityState?.rewindCharges || 0) > 0 && (this.rewindEffectTimer || 0) <= 0 &&
+                    mx >= GAME_CONFIG.width - 120 && mx <= GAME_CONFIG.width - 10 &&
+                    my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
+                    this.activateRewind();
+                    inputManager.resetJump();
+                    inputState.jumping = false;
                     return;
                 }
 
@@ -6950,6 +7183,7 @@
                         if (ability2.type === 'autumnWinterCoin') gameState.abilityState.seasonCoinTimer = 0;
                         if (ability2.type === 'fartBoost') gameState.abilityState.fartCharges = ability2.charges;
                         if (ability2.type === 'waveBlast') gameState.abilityState.waveCharges = ability2.charges;
+                        if (ability2.type === 'rewind') gameState.abilityState.rewindCharges = ability2.charges;
                         if (ability2.type === 'fireBlast') gameState.abilityState.fireBlastCharges = ability2.charges;
                         if (ability2.type === 'flight') { gameState.abilityState.flightCharges = ability2.charges; gameState.abilityState.flyingTimer = 0; }
                         if (ability2.type === 'eatObstacle') { gameState.abilityState.eatCharges = ability2.charges; gameState.abilityState.eatEffectTimer = 0; }
@@ -7692,7 +7926,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.19.0';
+        const GAME_VERSION = 'v3.20.0';
         if ('serviceWorker' in navigator) {
             // 첫 설치 직후 불필요한 새로고침 방지용: 등록 전에 컨트롤러 존재 여부 기억
             const hadController = !!navigator.serviceWorker.controller;
