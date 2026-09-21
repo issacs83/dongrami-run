@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.21.0';
+        var CURRENT_VER = 'v3.22.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -4260,6 +4260,58 @@
                 ctx.fillStyle = s.ground;
                 ctx.fillRect(0, GAME_CONFIG.groundY, GAME_CONFIG.width, GAME_CONFIG.height - GAME_CONFIG.groundY);
 
+                // ===== 물길(바다) 그리기 =====
+                // 땅을 칠한 뒤 그 위에 덮어씌워 바다처럼 보이게 함
+                const waterZones = (typeof engine !== 'undefined' && engine.scenes?.game?.waterZones) ? engine.scenes.game.waterZones : [];
+                waterZones.forEach(w => {
+                    const top = GAME_CONFIG.groundY;
+                    const depth = GAME_CONFIG.height - GAME_CONFIG.groundY;
+                    ctx.save();
+                    // 바다 그라데이션 (위는 밝은 하늘색, 아래로 갈수록 짙은 파랑)
+                    const seaGrad = ctx.createLinearGradient(0, top, 0, top + depth);
+                    seaGrad.addColorStop(0, '#4FC3F7');
+                    seaGrad.addColorStop(0.5, '#1E88E5');
+                    seaGrad.addColorStop(1, '#0D47A1');
+                    ctx.fillStyle = seaGrad;
+                    ctx.fillRect(w.x, top, w.width, depth);
+                    // 물결치는 수면
+                    ctx.beginPath();
+                    ctx.moveTo(w.x, top);
+                    for (let px = 0; px <= w.width; px += 8) {
+                        const wave = Math.sin(px * 0.05 + w.phase) * 4 + Math.sin(px * 0.11 + w.phase * 1.6) * 2;
+                        ctx.lineTo(w.x + px, top + wave);
+                    }
+                    ctx.lineTo(w.x + w.width, top + 14);
+                    ctx.lineTo(w.x, top + 14);
+                    ctx.closePath();
+                    ctx.fillStyle = '#81D4FA';
+                    ctx.fill();
+                    // 흰 물마루
+                    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    for (let px = 0; px <= w.width; px += 8) {
+                        const wave = Math.sin(px * 0.05 + w.phase) * 4 + Math.sin(px * 0.11 + w.phase * 1.6) * 2;
+                        if (px === 0) ctx.moveTo(w.x + px, top + wave);
+                        else ctx.lineTo(w.x + px, top + wave);
+                    }
+                    ctx.stroke();
+                    // 반짝이는 물비늘
+                    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+                    for (let i = 0; i < Math.floor(w.width / 70); i++) {
+                        const sx = w.x + 35 + i * 70 + Math.sin(w.phase + i) * 10;
+                        const sy = top + 22 + (i % 3) * 14;
+                        ctx.beginPath();
+                        ctx.ellipse(sx, sy, 9, 2.2, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    // 물길 양쪽 가장자리 (모래사장 느낌)
+                    ctx.fillStyle = 'rgba(255,224,130,0.8)';
+                    ctx.fillRect(w.x - 6, top - 2, 6, 10);
+                    ctx.fillRect(w.x + w.width, top - 2, 6, 10);
+                    ctx.restore();
+                });
+
                 // 땅 경계선
                 ctx.strokeStyle = s.groundLine;
                 ctx.lineWidth = 3;
@@ -4554,7 +4606,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.21.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.22.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 // ★ 숨겨진 큰코인 (매번 랜덤 위치 — 꽁꽁 숨어 있음!) ★
                 if (this.bigCoinVisible) {
@@ -5249,6 +5301,12 @@
                 this.obstacles = [];
                 this.coins = [];
                 this.powerUps = [];
+                // 물길 초기화
+                this.waterZones = [];
+                this.waterSpawnTimer = 0;
+                this.waterNextSpawn = 8 + Math.random() * 7;
+                this.inWater = false;
+                this.waterSplashTimer = 0;
                 this.particles = new ParticleSystem();
                 this.obstacleTimer = 3.0; // 첫 장애물까지 3초 대기
                 this.coinTimer = 1.5;
@@ -5260,6 +5318,13 @@
                 // 계란미 부활 연출 타이머와 변신 단계
                 this.eggReviveTimer = 0;
                 this.eggReviveStage = 0;
+                // 물길(바다) 구간 목록과 생성 타이머
+                // 각 구간은 { x: 화면 왼쪽 기준 위치, width: 구간 길이, phase: 파도 애니메이션 위상 }
+                this.waterZones = [];
+                this.waterSpawnTimer = 0;
+                this.waterNextSpawn = 8 + Math.random() * 7;
+                this.inWater = false;
+                this.waterSplashTimer = 0;
                 this.seasonBanner = null; // { text, timer }
                 this.lastSeason = 'spring';
                 this.prevSeasonForWinter = 'spring'; // 겨울→봄 전환 감지용
@@ -5307,6 +5372,39 @@
                 // 뒤로가기미 되감기 이펙트 타이머
                 if (this.rewindEffectTimer > 0) this.rewindEffectTimer -= deltaTime;
                 if (this.eggReviveTimer > 0) this.eggReviveTimer -= deltaTime;
+                // ===== 물길(바다) 구간 처리 =====
+                // 일정 시간마다 랜덤한 길이의 물길을 화면 오른쪽 바깥에 만들어 둠
+                this.waterSpawnTimer += deltaTime;
+                if (this.waterSpawnTimer >= this.waterNextSpawn) {
+                    this.waterSpawnTimer = 0;
+                    // 다음 물길까지 8~15초 랜덤 대기
+                    this.waterNextSpawn = 8 + Math.random() * 7;
+                    this.waterZones.push({
+                        x: GAME_CONFIG.width + 60,
+                        width: 260 + Math.random() * 320,
+                        phase: Math.random() * Math.PI * 2
+                    });
+                }
+                // 물길을 배경과 같은 속도로 왼쪽으로 흘려보내고, 화면을 벗어나면 제거
+                this.waterZones.forEach(w => {
+                    w.x -= gameState.gameSpeed;
+                    w.phase += deltaTime * 2.5;
+                });
+                this.waterZones = this.waterZones.filter(w => w.x + w.width > -80);
+                // 플레이어가 물길 위에 있는지 판정 (발밑 기준)
+                const pCenterX = this.player.x + GAME_CONFIG.playerSize / 2;
+                const wasInWater = this.inWater;
+                this.inWater = this.waterZones.some(w => pCenterX >= w.x && pCenterX <= w.x + w.width);
+                // 물에 들어가거나 나올 때 물보라 이펙트
+                if (this.inWater !== wasInWater) {
+                    this.waterSplashTimer = 0.4;
+                    for (let i = 0; i < 12; i++) {
+                        this.particles.createExplosion(pCenterX, GAME_CONFIG.groundY - 10, '#4FC3F7', 1);
+                    }
+                    audioManager.playCoinSound();
+                }
+                if (this.waterSplashTimer > 0) this.waterSplashTimer -= deltaTime;
+
                 // 뒤로가기미 능력을 가진 경우에만 게임 상태를 주기적으로 기록
                 if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'rewind') {
                     this.rewindSampleTimer += deltaTime;
@@ -5586,6 +5684,12 @@
                 gameState.gameSpeed = Math.min(16, finalSpeed); // 최대 16
                 // 천사 능력: 속도 부스트 (15% 빠르게)
                 const angelAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                // 물길 위에서는 속도가 느려짐 (점프해서 공중에 떠 있으면 정상 속도)
+                // 속도 계산이 끝난 뒤에 적용해야 덮어쓰이지 않음
+                if (this.inWater && !this.player.isJumping) {
+                    gameState.gameSpeed = gameState.gameSpeed * 0.62;
+                }
+
                 // 계란미: 알 단계일 때만 살짝 더 빠르게 달림
                 if (angelAbility?.type === 'eggLife' && angelAbility.speedBoost &&
                     (gameState.abilityState?.eggStage || 0) === 0) {
@@ -6132,6 +6236,21 @@
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
                 ctx.fillText(`점수: ${Math.floor(gameState.score)}`, 20, 20);
+
+                // 물길 진입 안내 (물 위에 있는 동안 표시)
+                if (this.inWater) {
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'rgba(13,71,161,0.75)';
+                    ctx.beginPath();
+                    ctx.roundRect(GAME_CONFIG.width / 2 - 110, 66, 220, 38, 12);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 19px Arial';
+                    ctx.fillText('🌊 물길! 느려짐', GAME_CONFIG.width / 2, 85);
+                    ctx.restore();
+                }
 
                 // 계란미 부활 연출 (노란 플래시 + 변신 안내)
                 if ((this.eggReviveTimer || 0) > 0) {
@@ -8166,7 +8285,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.21.0';
+        const GAME_VERSION = 'v3.22.0';
         if ('serviceWorker' in navigator) {
             // 첫 설치 직후 불필요한 새로고침 방지용: 등록 전에 컨트롤러 존재 여부 기억
             const hadController = !!navigator.serviceWorker.controller;
