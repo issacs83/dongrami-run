@@ -14,7 +14,7 @@
     }
     // Safari PWA 강제 버전 체크 (SW와 독립적으로 작동)
     (function() {
-        var CURRENT_VER = 'v3.20.0';
+        var CURRENT_VER = 'v3.21.0';
         try {
             var savedVer = localStorage.getItem('dongrami_version');
             if (savedVer && savedVer !== CURRENT_VER) {
@@ -2007,10 +2007,131 @@
                 cost: 2500, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
             };
 
+            // 계란미 (죽을 때마다 알 → 병아리 → 닭으로 변신하며 부활하는 캐릭터)
+            // 단계는 gameState.abilityState.eggStage 로 관리 (0=알, 1=병아리, 2=닭)
+            const gyeranmi = {
+                name: '계란미', colors: { main: '#FFF8E1', secondary: '#FFC107' }, size: 64,
+                drawSprite: function(ctx, x, y, frameIndex, isJumping, isDucking) {
+                    ctx.save(); ctx.translate(x + 32, y + 32);
+                    const stage = gameState.abilityState?.eggStage || 0;
+                    const bob = Math.sin(frameIndex * 0.15) * 1.5;
+                    ctx.translate(0, bob);
+                    if (stage === 0) {
+                        // 0단계: 알 - 흰 껍질에 금빛 얼룩
+                        ctx.fillStyle = '#FFFDF5';
+                        ctx.beginPath();
+                        ctx.ellipse(0, 2, 21, 26, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = '#E8D9A8'; ctx.lineWidth = 2;
+                        ctx.stroke();
+                        // 껍질 얼룩
+                        ctx.fillStyle = 'rgba(255,193,7,0.3)';
+                        ctx.beginPath(); ctx.arc(-9, -6, 4.5, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(8, 8, 3.5, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(2, -14, 3, 0, Math.PI * 2); ctx.fill();
+                        // 눈
+                        ctx.fillStyle = '#4A3B1A';
+                        ctx.beginPath(); ctx.arc(-7, 0, 3, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(7, 0, 3, 0, Math.PI * 2); ctx.fill();
+                        // 볼터치
+                        ctx.fillStyle = 'rgba(255,150,150,0.5)';
+                        ctx.beginPath(); ctx.arc(-13, 7, 4, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(13, 7, 4, 0, Math.PI * 2); ctx.fill();
+                        // 입
+                        ctx.strokeStyle = '#4A3B1A'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.moveTo(-4, 9); ctx.quadraticCurveTo(0, 13, 4, 9); ctx.stroke();
+                    } else if (stage === 1) {
+                        // 1단계: 병아리 - 노란 몸에 작은 날개와 부리
+                        ctx.fillStyle = '#FFD54F';
+                        ctx.beginPath(); ctx.arc(0, 5, 20, 0, Math.PI * 2); ctx.fill();
+                        // 머리
+                        ctx.beginPath(); ctx.arc(0, -13, 14, 0, Math.PI * 2); ctx.fill();
+                        // 머리 깃털
+                        ctx.strokeStyle = '#FFD54F'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+                        ctx.beginPath(); ctx.moveTo(0, -26); ctx.lineTo(-3, -32); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(2, -26); ctx.lineTo(5, -31); ctx.stroke();
+                        // 날개 (퍼덕임)
+                        const flap = Math.sin(frameIndex * 0.3) * 0.4;
+                        ctx.save(); ctx.translate(-18, 3); ctx.rotate(flap);
+                        ctx.fillStyle = '#FFCA28';
+                        ctx.beginPath(); ctx.ellipse(0, 0, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.restore();
+                        ctx.save(); ctx.translate(18, 3); ctx.rotate(-flap);
+                        ctx.fillStyle = '#FFCA28';
+                        ctx.beginPath(); ctx.ellipse(0, 0, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.restore();
+                        // 부리
+                        ctx.fillStyle = '#FF9800';
+                        ctx.beginPath();
+                        ctx.moveTo(0, -10); ctx.lineTo(9, -7); ctx.lineTo(0, -4);
+                        ctx.closePath(); ctx.fill();
+                        // 눈
+                        ctx.fillStyle = '#3E2723';
+                        ctx.beginPath(); ctx.arc(-5, -15, 2.8, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(5, -15, 2.8, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#FFF';
+                        ctx.beginPath(); ctx.arc(-5.8, -16, 1.1, 0, Math.PI * 2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(4.2, -16, 1.1, 0, Math.PI * 2); ctx.fill();
+                        // 다리
+                        ctx.strokeStyle = '#FF9800'; ctx.lineWidth = 2.5;
+                        ctx.beginPath(); ctx.moveTo(-6, 24); ctx.lineTo(-6, 29); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(6, 24); ctx.lineTo(6, 29); ctx.stroke();
+                    } else {
+                        // 2단계: 닭 - 흰 몸에 빨간 볏과 턱볏
+                        // 달리는 방향(오른쪽)을 보도록 좌우 반전해서 그림
+                        ctx.scale(-1, 1);
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath(); ctx.ellipse(0, 7, 21, 18, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.strokeStyle = '#E0E0E0'; ctx.lineWidth = 1.5; ctx.stroke();
+                        // 꼬리 깃털
+                        ctx.fillStyle = '#EEEEEE';
+                        ctx.beginPath();
+                        ctx.moveTo(18, 2); ctx.quadraticCurveTo(30, -8, 26, 6);
+                        ctx.quadraticCurveTo(24, 10, 18, 8);
+                        ctx.closePath(); ctx.fill();
+                        // 머리
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath(); ctx.arc(-4, -13, 13, 0, Math.PI * 2); ctx.fill();
+                        // 볏 (머리 위 빨간 벼슬)
+                        ctx.fillStyle = '#E53935';
+                        ctx.beginPath();
+                        ctx.arc(-9, -25, 4, 0, Math.PI * 2);
+                        ctx.arc(-3, -27, 4.5, 0, Math.PI * 2);
+                        ctx.arc(3, -25, 3.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        // 턱볏
+                        ctx.beginPath(); ctx.ellipse(-8, -4, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
+                        // 부리
+                        ctx.fillStyle = '#FFA726';
+                        ctx.beginPath();
+                        ctx.moveTo(-14, -13); ctx.lineTo(-25, -10); ctx.lineTo(-14, -7);
+                        ctx.closePath(); ctx.fill();
+                        // 눈
+                        ctx.fillStyle = '#3E2723';
+                        ctx.beginPath(); ctx.arc(-8, -16, 2.8, 0, Math.PI * 2); ctx.fill();
+                        ctx.fillStyle = '#FFF';
+                        ctx.beginPath(); ctx.arc(-8.8, -17, 1.1, 0, Math.PI * 2); ctx.fill();
+                        // 날개
+                        const wflap = Math.sin(frameIndex * 0.25) * 0.3;
+                        ctx.save(); ctx.translate(2, 6); ctx.rotate(wflap);
+                        ctx.fillStyle = '#F5F5F5';
+                        ctx.beginPath(); ctx.ellipse(0, 0, 11, 7, 0, 0, Math.PI * 2); ctx.fill();
+                        ctx.strokeStyle = '#E0E0E0'; ctx.lineWidth = 1.2; ctx.stroke();
+                        ctx.restore();
+                        // 다리
+                        ctx.strokeStyle = '#FFA726'; ctx.lineWidth = 3;
+                        ctx.beginPath(); ctx.moveTo(-6, 24); ctx.lineTo(-6, 30); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(6, 24); ctx.lineTo(6, 30); ctx.stroke();
+                    }
+                    ctx.restore();
+                },
+                cost: 3000, hitbox: { offsetX: 8, offsetY: 8, width: 48, height: 48 }
+            };
+
             // 순서 재배치
-            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '주주미', '농구미', '비행미', '파도미', '불미', '무사', '악마', '천사', '뒤로가기미', '물음표미', '골든동그라미'];
+            const desiredOrder = ['동그라미', '네모미', '별미', '삼각미', '김여름', '하트미', '동그라미하준', '가스미', '냠냠미', '주주미', '농구미', '비행미', '파도미', '불미', '무사', '악마', '천사', '뒤로가기미', '계란미', '물음표미', '골든동그라미'];
             const oldSprites = spriteConfig.sprites;
-            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '주주미': jujumi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '불미': bulmi, '무사': musa, '악마': akma, '천사': angel, '뒤로가기미': dwirogagimi, '물음표미': mulEumpyomi, '골든동그라미': goldenDongrami };
+            const extras = { '김여름': kimYeoreum, '동그라미하준': donggramiHajun, '가스미': gasmi, '냠냠미': nyamnyammi, '주주미': jujumi, '농구미': nonggoomi, '비행미': bihaengmi, '파도미': padomi, '불미': bulmi, '무사': musa, '악마': akma, '천사': angel, '뒤로가기미': dwirogagimi, '계란미': gyeranmi, '물음표미': mulEumpyomi, '골든동그라미': goldenDongrami };
             const newSprites = {};
             desiredOrder.forEach(name => {
                 if (oldSprites[name]) newSprites[name] = oldSprites[name];
@@ -2131,6 +2252,7 @@
             '천사': { name: '천사의 축복', desc: '악당&버섯 면역 + 속도↑', type: 'angelBlessing', speedBoost: 1.15 },
             '골든동그라미': { name: '황금빛', desc: '코인 2배 획득', type: 'coinMultiplier', coinMulti: 2 },
             '뒤로가기미': { name: '시간 되감기', desc: '3초 전으로 되돌리기 (50회)', type: 'rewind', charges: 50 },
+            '계란미': { name: '부활의 알', desc: '죽으면 병아리→닭으로 부활 (체력5) + 장애물 제거 20회', type: 'eggLife', charges: 20, speedBoost: 1.08 },
             '물음표미': { name: '수수께끼', desc: '플레이할 때마다 능력이 바뀜!', type: 'random' }
         };
 
@@ -2175,6 +2297,7 @@
             '무사': '???',
             '물음표미': '???',
             '뒤로가기미': '전설',
+            '계란미': '전설',
             '동그라미하준': '전설',
             '천사': '전설',
             '악마': '좋음',
@@ -4431,7 +4554,7 @@
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.font = '13px Arial';
-                ctx.fillText('v3.20.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
+                ctx.fillText('v3.21.0', GAME_CONFIG.width - 15, GAME_CONFIG.height - 12);
 
                 // ★ 숨겨진 큰코인 (매번 랜덤 위치 — 꽁꽁 숨어 있음!) ★
                 if (this.bigCoinVisible) {
@@ -4560,6 +4683,10 @@
                         if (ability.type === 'fartBoost') gameState.abilityState.fartCharges = ability.charges;
                         if (ability.type === 'waveBlast') gameState.abilityState.waveCharges = ability.charges;
                         if (ability.type === 'rewind') gameState.abilityState.rewindCharges = ability.charges;
+                        if (ability.type === 'eggLife') {
+                            gameState.abilityState.eggStage = 0;
+                            gameState.abilityState.eggCharges = ability.charges;
+                        }
                         if (ability.type === 'fireBlast') gameState.abilityState.fireBlastCharges = ability.charges;
                         if (ability.type === 'flight') { gameState.abilityState.flightCharges = ability.charges; gameState.abilityState.flyingTimer = 0; }
                         if (ability.type === 'eatObstacle') { gameState.abilityState.eatCharges = ability.charges; gameState.abilityState.eatEffectTimer = 0; }
@@ -5130,6 +5257,9 @@
                 this.rewindHistory = [];
                 this.rewindSampleTimer = 0;
                 this.rewindEffectTimer = 0;
+                // 계란미 부활 연출 타이머와 변신 단계
+                this.eggReviveTimer = 0;
+                this.eggReviveStage = 0;
                 this.seasonBanner = null; // { text, timer }
                 this.lastSeason = 'spring';
                 this.prevSeasonForWinter = 'spring'; // 겨울→봄 전환 감지용
@@ -5176,6 +5306,7 @@
                 if (gameState.rolledAbilityTimer > 0) gameState.rolledAbilityTimer -= deltaTime;
                 // 뒤로가기미 되감기 이펙트 타이머
                 if (this.rewindEffectTimer > 0) this.rewindEffectTimer -= deltaTime;
+                if (this.eggReviveTimer > 0) this.eggReviveTimer -= deltaTime;
                 // 뒤로가기미 능력을 가진 경우에만 게임 상태를 주기적으로 기록
                 if (CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'rewind') {
                     this.rewindSampleTimer += deltaTime;
@@ -5262,6 +5393,12 @@
                 this.particles.update(deltaTime);
 
                 // 가스미 방귀 부스터: 키보드 F키 활성화 (쿨다운: 이펙트 재생 중 재발동 방지)
+                // 계란미: F키로 장애물 제거 발동
+                if ((inputState.fart || inputState.rewind) && CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'eggLife' &&
+                    (gameState.abilityState?.eggCharges || 0) > 0) {
+                    this.activateEggBlast();
+                }
+
                 // 뒤로가기미: R키로 되감기 발동
                 if (inputState.rewind && CHARACTER_ABILITIES[gameState.selectedCharacter]?.type === 'rewind' &&
                     (gameState.abilityState?.rewindCharges || 0) > 0 && (this.rewindEffectTimer || 0) <= 0) {
@@ -5449,6 +5586,11 @@
                 gameState.gameSpeed = Math.min(16, finalSpeed); // 최대 16
                 // 천사 능력: 속도 부스트 (15% 빠르게)
                 const angelAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                // 계란미: 알 단계일 때만 살짝 더 빠르게 달림
+                if (angelAbility?.type === 'eggLife' && angelAbility.speedBoost &&
+                    (gameState.abilityState?.eggStage || 0) === 0) {
+                    gameState.gameSpeed = Math.min(22, gameState.gameSpeed * angelAbility.speedBoost);
+                }
                 if (angelAbility?.type === 'angelBlessing' && angelAbility.speedBoost) {
                     gameState.gameSpeed = Math.min(22, gameState.gameSpeed * angelAbility.speedBoost);
                 }
@@ -5885,10 +6027,28 @@
                             audioManager.playJumpSound(); // 피격음
 
                             if (gameState.lives <= 0) {
-                                gameState.isRunning = false;
-                                gameState.currentScene = 'gameOver';
-                                audioManager.playGameOverSound();
-                                if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
+                                // 계란미 부활: 알 → 병아리 → 닭 순서로 변신하며 되살아남
+                                const eggAbility = CHARACTER_ABILITIES[gameState.selectedCharacter];
+                                if (eggAbility?.type === 'eggLife' && (gameState.abilityState.eggStage || 0) < 2) {
+                                    gameState.abilityState.eggStage = (gameState.abilityState.eggStage || 0) + 1;
+                                    // 부활할 때마다 체력은 항상 5로 회복
+                                    gameState.lives = 5;
+                                    gameState.invulnTimer = 3.0;
+                                    gameState.hitFlashTimer = 0;
+                                    // 부활 순간 화면의 장애물을 전부 치워줌
+                                    this.obstacles.forEach(o => {
+                                        this.particles.createExplosion(o.x, o.y, '#FFD54F', 8);
+                                    });
+                                    this.obstacles = [];
+                                    this.eggReviveTimer = 2.5;
+                                    this.eggReviveStage = gameState.abilityState.eggStage;
+                                    audioManager.playPowerUpSound();
+                                } else {
+                                    gameState.isRunning = false;
+                                    gameState.currentScene = 'gameOver';
+                                    audioManager.playGameOverSound();
+                                    if (typeof seasonalBGM !== 'undefined') seasonalBGM.stop();
+                                }
                             }
                         }
                     }
@@ -5972,6 +6132,28 @@
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
                 ctx.fillText(`점수: ${Math.floor(gameState.score)}`, 20, 20);
+
+                // 계란미 부활 연출 (노란 플래시 + 변신 안내)
+                if ((this.eggReviveTimer || 0) > 0) {
+                    ctx.save();
+                    const et = Math.min(1, this.eggReviveTimer / 2.5);
+                    ctx.fillStyle = `rgba(255,213,79,${0.4 * et})`;
+                    ctx.fillRect(0, 0, GAME_CONFIG.width, GAME_CONFIG.height);
+                    ctx.globalAlpha = et;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const reviveText = this.eggReviveStage === 1 ? '🐤 병아리로 부활!' : '🐔 닭으로 부활!';
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.strokeStyle = '#F57F17';
+                    ctx.lineWidth = 5;
+                    ctx.font = 'bold 46px Arial';
+                    ctx.strokeText(reviveText, GAME_CONFIG.width / 2, GAME_CONFIG.height / 2 - 20);
+                    ctx.fillText(reviveText, GAME_CONFIG.width / 2, GAME_CONFIG.height / 2 - 20);
+                    ctx.font = 'bold 22px Arial';
+                    ctx.strokeText('체력 5로 회복!', GAME_CONFIG.width / 2, GAME_CONFIG.height / 2 + 25);
+                    ctx.fillText('체력 5로 회복!', GAME_CONFIG.width / 2, GAME_CONFIG.height / 2 + 25);
+                    ctx.restore();
+                }
 
                 // 뒤로가기미 되감기 화면 효과 (청록색 플래시 + 안내 문구)
                 if ((this.rewindEffectTimer || 0) > 0) {
@@ -6225,6 +6407,34 @@
                         ctx.fillText('(F키)', btnX + 55, btnY + 45);
                     }
                 }
+                // 계란미 HUD (현재 단계 + 남은 제거 횟수)
+                if (abilityType === 'eggLife') {
+                    const echarges = gameState.abilityState?.eggCharges || 0;
+                    const estage = gameState.abilityState?.eggStage || 0;
+                    const stageNames = ['🥚 알', '🐤 병아리', '🐔 닭'];
+                    ctx.fillStyle = '#F57F17';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`${stageNames[estage]} (부활 ${2 - estage}회 남음)`, 15, 135);
+                    ctx.fillStyle = echarges > 0 ? '#F9A825' : '#666';
+                    ctx.fillText(`💥 장애물 제거 ${echarges}회`, 15, 155);
+                    if (echarges > 0) {
+                        const btnX = GAME_CONFIG.width - 120;
+                        const btnY = GAME_CONFIG.height - 65;
+                        ctx.fillStyle = 'rgba(249,168,37,0.9)';
+                        ctx.beginPath(); ctx.roundRect(btnX, btnY, 110, 50, 12); ctx.fill();
+                        ctx.strokeStyle = '#F57F17'; ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.roundRect(btnX, btnY, 110, 50, 12); ctx.stroke();
+                        ctx.fillStyle = '#FFF';
+                        ctx.font = 'bold 18px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('💥 제거', btnX + 55, btnY + 22);
+                        ctx.font = '11px Arial';
+                        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                        ctx.fillText('(F키)', btnX + 55, btnY + 40);
+                    }
+                }
+
                 // 뒤로가기미 되감기 HUD
                 if (abilityType === 'rewind') {
                     const rcharges = gameState.abilityState?.rewindCharges || 0;
@@ -6575,6 +6785,20 @@
                 if (this.rewindHistory.length > 40) this.rewindHistory.shift();
             }
 
+            activateEggBlast() {
+                // 계란미 장애물 제거: 화면의 장애물을 한 번에 치움
+                if ((gameState.abilityState?.eggCharges || 0) <= 0) return;
+                if (this.obstacles.length === 0) return;
+                gameState.abilityState.eggCharges--;
+                this.obstacles.forEach(o => {
+                    this.particles.createExplosion(o.x, o.y, '#FFD54F', 10);
+                    this.particles.createExplosion(o.x, o.y, '#FFF8E1', 6);
+                });
+                this.obstacles = [];
+                this.eggBlastTimer = 0.5;
+                audioManager.playPowerUpSound();
+            }
+
             activateRewind() {
                 // 충전량이 없거나 되돌릴 기록이 부족하면 발동하지 않음
                 if ((gameState.abilityState?.rewindCharges || 0) <= 0) return;
@@ -6695,6 +6919,18 @@
                     this.activateFlight();
                     inputManager.resetJump();
                     inputState.jumping = false; // 버튼 탭이 점프로 새지 않도록
+                    return;
+                }
+
+                // 계란미 장애물 제거 버튼: 우측 하단
+                const abilityTypeEgg = CHARACTER_ABILITIES[gameState.selectedCharacter]?.type;
+                if (abilityTypeEgg === 'eggLife' && inputState.jumping && !gameState.isPaused &&
+                    (gameState.abilityState?.eggCharges || 0) > 0 &&
+                    mx >= GAME_CONFIG.width - 120 && mx <= GAME_CONFIG.width - 10 &&
+                    my >= GAME_CONFIG.height - 65 && my <= GAME_CONFIG.height - 15) {
+                    this.activateEggBlast();
+                    inputManager.resetJump();
+                    inputState.jumping = false;
                     return;
                 }
 
@@ -7184,6 +7420,10 @@
                         if (ability2.type === 'fartBoost') gameState.abilityState.fartCharges = ability2.charges;
                         if (ability2.type === 'waveBlast') gameState.abilityState.waveCharges = ability2.charges;
                         if (ability2.type === 'rewind') gameState.abilityState.rewindCharges = ability2.charges;
+                        if (ability2.type === 'eggLife') {
+                            gameState.abilityState.eggStage = 0;
+                            gameState.abilityState.eggCharges = ability2.charges;
+                        }
                         if (ability2.type === 'fireBlast') gameState.abilityState.fireBlastCharges = ability2.charges;
                         if (ability2.type === 'flight') { gameState.abilityState.flightCharges = ability2.charges; gameState.abilityState.flyingTimer = 0; }
                         if (ability2.type === 'eatObstacle') { gameState.abilityState.eatCharges = ability2.charges; gameState.abilityState.eatEffectTimer = 0; }
@@ -7926,7 +8166,7 @@
         engine.run();
 
         // Service Worker 등록 + 강제 업데이트 체크
-        const GAME_VERSION = 'v3.20.0';
+        const GAME_VERSION = 'v3.21.0';
         if ('serviceWorker' in navigator) {
             // 첫 설치 직후 불필요한 새로고침 방지용: 등록 전에 컨트롤러 존재 여부 기억
             const hadController = !!navigator.serviceWorker.controller;
